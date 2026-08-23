@@ -1,0 +1,1817 @@
+<!doctype html>
+<!--
+  Discovery:
+    deliverable: 家庭物品管理系统 手机 App 可交互原型 (390×844 authoring, responsive)
+    audience: 家庭全员（管理员=家长 / 成员 / 访客=老人孩子）
+    direction: 温暖居家整理感 — 暖米白 + 苔藓绿 accent + 衬线 display
+    sections: 5 主屏（首页/物品/位置/提醒/我的）+ 4 流程页（拍照添加/药品扫描/物品详情/成员权限）
+    accent: #5F7F5A (oklch 0.55 0.06 145)，danger #C94F4F，warn #C08A2D
+    fonts: display=Songti SC/Noto Serif SC serif；body=PingFang SC 系
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>家庭物品管理系统</title>
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#5F7F5A" />
+<meta name="description" content="全家的物品数字账本：拍照记录、药品效期临期提醒、位置树管理、家人按权限共同维护。" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-title" content="家庭物品" />
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+<link rel="icon" type="image/png" href="icons/icon-192.png" />
+<script id="auto-designer-preview-contract" type="application/json">
+  {
+    "artifactRole": "interactive-homepage",
+    "authoringViewport": { "width": 390, "height": 844 },
+    "deviceAdaptation": {
+      "enabled": true,
+      "strategy": "responsive",
+      "supportedDevices": ["desktop", "tablet", "mobile"]
+    },
+    "breakpoints": { "mobileMax": 767, "tabletMin": 768, "tabletMax": 1023, "desktopMin": 1024 },
+    "defaultDevice": "canvas"
+  }
+</script>
+<style>
+  :root {
+    --bg:      #F6F3EC;
+    --surface: #FFFFFF;
+    --fg:      #2A2A26;
+    --muted:   #8A857B;
+    --border:  #E8E3D9;
+    --accent:  #5F7F5A;
+    --accent-soft: color-mix(in oklch, var(--accent) 14%, transparent);
+    --accent-deep: #46613F;
+    --success: #3E7A4F;
+    --warn:    #C08A2D;
+    --warn-soft: color-mix(in oklch, #C08A2D 13%, transparent);
+    --danger:  #C94F4F;
+    --danger-soft: color-mix(in oklch, #C94F4F 12%, transparent);
+
+    --font-display: 'Songti SC', 'Noto Serif SC', 'STSong', 'SimSun', serif;
+    --font-body: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', 'Segoe UI', sans-serif;
+    --font-mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Consolas, monospace;
+
+    --fs-h1: 26px;
+    --fs-h2: 20px;
+    --fs-h3: 16px;
+    --fs-body: 15px;
+    --fs-meta: 12px;
+
+    --radius-card: 18px;
+    --radius-pill: 999px;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; }
+  body {
+    background: radial-gradient(60% 80% at 50% 0%, color-mix(in oklch, var(--accent) 8%, var(--bg)) 0%, var(--bg) 60%);
+    color: var(--fg);
+    font-family: var(--font-body);
+    font-size: var(--fs-body);
+    line-height: 1.4;
+    -webkit-font-smoothing: antialiased;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+  }
+
+  .stage { display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; height: 100%; }
+  .caption {
+    display: none; font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--muted); margin-bottom: 12px;
+  }
+  .caption strong { color: var(--fg); font-weight: 500; }
+
+  .screen {
+    position: relative;
+    width: min(390px, 100vw);
+    height: min(844px, 100vh);
+    background: var(--bg);
+    border-radius: 44px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 0 0 1px rgba(0,0,0,0.06), 0 28px 60px -12px rgba(0,0,0,0.18), 0 8px 20px -8px rgba(0,0,0,0.12);
+  }
+  html[data-auto-designer-preview-device="tablet"] .screen { width: min(834px, 100vw); height: min(1112px, 100vh); border-radius: 32px; }
+  html[data-auto-designer-preview-device="desktop"] .screen { width: 100vw; height: 100vh; border-radius: 0; box-shadow: none; }
+
+  .statusbar {
+    flex: 0 0 54px; padding: 14px 26px 0;
+    display: flex; align-items: flex-start; justify-content: space-between;
+    font-size: 15px; font-weight: 600; letter-spacing: -0.01em;
+  }
+  .statusbar .right { display: inline-flex; align-items: center; gap: 6px; }
+  .statusbar svg { width: 17px; height: 11px; fill: var(--fg); }
+  .statusbar .battery { width: 25px; }
+
+  .content {
+    flex: 1 1 auto; overflow-y: auto; overflow-x: hidden;
+    -webkit-overflow-scrolling: touch; padding: 8px 0 28px;
+  }
+  .content::-webkit-scrollbar { display: none; }
+
+  .home-indicator { flex: 0 0 28px; position: relative; }
+  .home-indicator::after {
+    content: ''; position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%);
+    width: 134px; height: 5px; background: var(--fg); border-radius: 999px; opacity: 0.85;
+  }
+
+  /* ─── primitives ─── */
+  .pad { padding-inline: 20px; }
+  .stack { display: flex; flex-direction: column; gap: 16px; }
+  .row { display: flex; align-items: center; gap: 12px; }
+  .row-between { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+  .header { padding: 8px 20px 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .header h1 { font-family: var(--font-display); font-size: var(--fs-h1); letter-spacing: -0.02em; line-height: 1.15; margin: 0; }
+  .header .icon-btn {
+    width: 44px; height: 44px; border-radius: 999px; background: var(--surface);
+    border: 1px solid var(--border); display: grid; place-items: center; color: var(--fg);
+    cursor: pointer; transition: transform var(--motion-fast, 120ms) ease, border-color 120ms ease;
+  }
+  .header .icon-btn:hover { border-color: color-mix(in oklch, var(--accent) 40%, var(--border)); }
+  .header .icon-btn:active { transform: scale(0.92); }
+  .header .icon-btn svg { width: 19px; height: 19px; stroke: currentColor; fill: none; stroke-width: 1.7; }
+  .greeting { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 0 0 4px; }
+
+  .h2 { font-family: var(--font-display); font-size: var(--fs-h2); letter-spacing: -0.015em; line-height: 1.2; margin: 0; }
+  .h3 { font-size: var(--fs-h3); font-weight: 600; line-height: 1.3; margin: 0; }
+  .meta { font-family: var(--font-mono); font-size: var(--fs-meta); color: var(--muted); }
+  .num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 16px; }
+  .card.accent { background: var(--accent); color: #fff; border-color: transparent; }
+  .card.accent .meta { color: rgba(255,255,255,0.78); }
+  .card.flat { background: transparent; border: 0; padding: 12px 0; border-top: 1px solid var(--border); border-radius: 0; }
+  .card.flat:first-child { border-top: 0; padding-top: 0; }
+
+  .btn-primary, .btn-secondary {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    width: 100%; min-height: 48px; padding: 14px 20px; border-radius: 14px;
+    font: inherit; font-size: 15px; font-weight: 600; letter-spacing: -0.005em; cursor: pointer;
+    transition: transform 120ms ease, opacity 120ms ease;
+  }
+  .btn-primary { background: var(--accent); color: #fff; border: 0; }
+  .btn-primary:active { transform: scale(0.98); }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-secondary { background: transparent; color: var(--fg); border: 1px solid var(--border); font-weight: 500; }
+  .btn-secondary:active { transform: scale(0.98); }
+
+  .ph-img {
+    background: linear-gradient(135deg, var(--accent-soft), color-mix(in oklch, var(--fg) 6%, transparent)), var(--surface);
+    border: 1px solid var(--border); border-radius: 14px; aspect-ratio: 4 / 3;
+    display: grid; place-items: center; color: var(--muted);
+    font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.04em;
+  }
+  .ph-img.square { aspect-ratio: 1 / 1; }
+  .ph-img.wide { aspect-ratio: 16 / 9; }
+
+  .pill {
+    display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px;
+    background: var(--accent-soft); color: var(--accent-deep); border-radius: 999px;
+    font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase;
+  }
+  .tag {
+    display: inline-flex; align-items: center; padding: 5px 12px; min-height: 28px;
+    background: transparent; color: var(--muted); border: 1px solid var(--border);
+    border-radius: 999px; font-size: 12px; cursor: pointer;
+    transition: all 120ms ease;
+  }
+  .tag.active { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 500; }
+
+  /* badge for expiry */
+  .badge {
+    display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px;
+    border-radius: 8px; font-family: var(--font-mono); font-size: 10px; font-weight: 600;
+  }
+  .badge.danger { background: var(--danger-soft); color: var(--danger); }
+  .badge.warn { background: var(--warn-soft); color: var(--warn); }
+  .badge.ok { background: var(--accent-soft); color: var(--accent-deep); }
+
+  /* toggle */
+  .switch { position: relative; width: 48px; height: 28px; flex-shrink: 0; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .switch .track {
+    position: absolute; inset: 0; border-radius: 999px; background: var(--border);
+    transition: background 160ms ease; cursor: pointer;
+  }
+  .switch .track::after {
+    content: ''; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px;
+    border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    transition: transform 160ms ease;
+  }
+  .switch input:checked + .track { background: var(--accent); }
+  .switch input:checked + .track::after { transform: translateX(20px); }
+  .switch input:focus-visible + .track { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* ─── pages ─── */
+  .page { display: none; }
+  .page.active { display: block; animation: pageIn 200ms cubic-bezier(0.2, 0, 0, 1); }
+  @keyframes pageIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+  /* hero radar card */
+  .radar-card { background: var(--accent); border-radius: var(--radius-card); padding: 20px; color: #fff; position: relative; overflow: hidden; }
+  .radar-card::after {
+    content: ''; position: absolute; right: -40px; top: -40px; width: 140px; height: 140px;
+    border-radius: 50%; background: rgba(255,255,255,0.08);
+  }
+  .radar-card .radar-title { font-family: var(--font-display); font-size: 18px; margin: 0 0 4px; }
+  .radar-card .radar-sub { font-size: 12px; color: rgba(255,255,255,0.8); margin: 0 0 14px; }
+  .radar-row {
+    display: flex; align-items: center; gap: 10px; padding: 9px 0;
+    border-top: 1px solid rgba(255,255,255,0.16); cursor: pointer;
+  }
+  .radar-row:first-of-type { border-top: 0; }
+  .radar-row .r-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .radar-row .r-name { flex: 1; font-size: 13px; font-weight: 500; }
+  .radar-row .r-date { font-family: var(--font-mono); font-size: 11px; color: rgba(255,255,255,0.85); }
+
+  /* item row */
+  .item-row {
+    display: grid; grid-template-columns: 52px 1fr auto; align-items: center; gap: 12px;
+    padding: 12px 0; border-top: 1px solid var(--border); cursor: pointer;
+  }
+  .item-row:first-child { border-top: 0; }
+  .item-row:hover .i-name { color: var(--accent-deep); }
+  .radar-row:hover { opacity: 0.9; }
+  .card[data-action]:hover, .card.row[data-action]:hover { border-color: color-mix(in oklch, var(--accent) 35%, var(--border)); }
+  .tag:hover { border-color: color-mix(in oklch, var(--muted) 60%, var(--border)); }
+  .btn-secondary:hover { border-color: color-mix(in oklch, var(--accent) 45%, var(--border)); color: var(--accent-deep); }
+  .item-thumb {
+    width: 52px; height: 52px; border-radius: 12px; overflow: hidden;
+    background: linear-gradient(135deg, var(--accent-soft), color-mix(in oklch, var(--fg) 5%, transparent));
+    display: grid; place-items: center; border: 1px solid var(--border);
+  }
+  .item-thumb svg { width: 22px; height: 22px; stroke: var(--accent-deep); fill: none; stroke-width: 1.6; }
+  .item-row .i-name { font-size: 15px; font-weight: 500; line-height: 1.25; }
+  .item-row .i-sub { color: var(--muted); font-size: 12px; line-height: 1.3; margin-top: 3px; }
+
+  /* location tree */
+  .loc-node {
+    border: 1px solid var(--border); background: var(--surface); border-radius: 16px;
+    margin-bottom: 10px; overflow: hidden;
+  }
+  .loc-node > .loc-head {
+    display: flex; align-items: center; gap: 10px; padding: 13px 14px; cursor: pointer;
+    min-height: 48px;
+  }
+  .loc-node .chev { width: 18px; height: 18px; stroke: var(--muted); fill: none; stroke-width: 2; transition: transform 160ms ease; }
+  .loc-node.open > .loc-head .chev { transform: rotate(90deg); }
+  .loc-node .loc-count { font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
+  .loc-children { display: none; padding: 0 14px 12px; }
+  .loc-node.open > .loc-children { display: block; }
+  .loc-child {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    padding: 9px 4px; border-top: 1px solid var(--border); font-size: 13px; cursor: pointer;
+  }
+  .loc-child:first-child { border-top: 0; }
+
+  /* tabbar */
+  .tabbar {
+    flex: 0 0 auto; display: grid; grid-template-columns: repeat(5, 1fr);
+    padding: 8px 6px 0; border-top: 1px solid var(--border);
+    background: color-mix(in oklch, var(--surface) 92%, transparent);
+    backdrop-filter: blur(20px);
+  }
+  .tab {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    padding: 8px 0; color: var(--muted); font-size: 10px; letter-spacing: 0.02em;
+    background: none; border: 0; cursor: pointer; min-height: 48px;
+    transition: color 150ms ease;
+  }
+  .tab.active { color: var(--accent-deep); font-weight: 600; }
+  .tab svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 1.7; }
+  .tab.active svg { stroke-width: 2; }
+
+  /* scan / camera screens */
+  .camera-view {
+    position: relative; border-radius: 20px; overflow: hidden; aspect-ratio: 3/4;
+    background: #23231F;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+  }
+  .camera-view .frame-line {
+    position: absolute; inset: 18px; border: 1.5px dashed rgba(255,255,255,0.55); border-radius: 16px;
+  }
+  .camera-view .scan-tip { color: rgba(255,255,255,0.85); font-size: 13px; text-align: center; padding: 0 24px; z-index: 1; }
+  .camera-view .scan-tip .mono { font-family: var(--font-mono); font-size: 11px; color: rgba(255,255,255,0.6); display: block; margin-top: 6px; }
+  .shutter-btn {
+    width: 64px; height: 64px; border-radius: 50%; background: #fff; border: 0;
+    position: relative; cursor: pointer; transition: transform 120ms ease;
+  }
+  .shutter-btn::after {
+    content: ''; position: absolute; inset: 8px; border-radius: 50%; background: var(--accent);
+  }
+  .shutter-btn:active { transform: scale(0.9); }
+
+  /* skeleton (scanning) */
+  .skeleton { border-radius: 10px; background: linear-gradient(100deg, #EFECE4 40%, #F7F4EE 50%, #EFECE4 60%); background-size: 200% 100%; animation: shimmer 1.2s infinite; }
+  @keyframes shimmer { to { background-position: -200% 0; } }
+
+  /* confirm field */
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; font-weight: 500; }
+  .field .input {
+    display: flex; align-items: center; gap: 8px; min-height: 46px; padding: 10px 14px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px; font-size: 15px;
+  }
+  .field .input .ai-tag {
+    display: inline-flex; align-items: center; gap: 3px; padding: 2px 7px; border-radius: 6px;
+    background: var(--accent-soft); color: var(--accent-deep);
+    font-family: var(--font-mono); font-size: 9px; font-weight: 600; letter-spacing: 0.04em;
+    flex-shrink: 0;
+  }
+  .field .input .ai-tag svg { width: 10px; height: 10px; stroke: currentColor; fill: none; stroke-width: 2; }
+  .field .input.editable { cursor: text; }
+  .field .hint { font-size: 11px; color: var(--muted); margin-top: 5px; line-height: 1.5; }
+  .field .hint .conf { color: var(--success); font-weight: 600; }
+
+  /* role badge */
+  .role-badge {
+    display: inline-flex; padding: 3px 10px; border-radius: 999px;
+    font-size: 11px; font-weight: 600; letter-spacing: 0.02em;
+  }
+  .role-badge.admin { background: var(--accent); color: #fff; }
+  .role-badge.member { background: var(--accent-soft); color: var(--accent-deep); }
+  .role-badge.guest { background: color-mix(in oklch, var(--muted) 14%, transparent); color: var(--muted); }
+
+  /* toast */
+  .toast {
+    position: absolute; left: 50%; bottom: 96px; transform: translateX(-50%) translateY(20px);
+    background: var(--fg); color: #fff; padding: 10px 18px; border-radius: 999px;
+    font-size: 13px; opacity: 0; pointer-events: none; transition: all 220ms cubic-bezier(0.2, 0, 0, 1);
+    z-index: 50; white-space: nowrap;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* back bar for flow pages */
+  .flow-bar { display: flex; align-items: center; gap: 12px; padding: 4px 16px 12px; }
+  .flow-bar .back-btn {
+    width: 44px; height: 44px; border-radius: 999px; background: var(--surface);
+    border: 1px solid var(--border); display: grid; place-items: center; cursor: pointer;
+    color: var(--fg); flex-shrink: 0;
+    transition: border-color 120ms ease, transform 120ms ease;
+  }
+  .flow-bar .back-btn:hover { border-color: color-mix(in oklch, var(--accent) 40%, var(--border)); }
+  .flow-bar .back-btn svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 1.8; }
+  .flow-bar .flow-title { font-size: 15px; font-weight: 600; }
+
+  .progress-dots { display: flex; gap: 6px; justify-content: center; margin: 16px 0; }
+  .progress-dots span { width: 6px; height: 6px; border-radius: 50%; background: var(--border); }
+  .progress-dots span.on { width: 18px; border-radius: 999px; background: var(--accent); }
+
+  .perm-matrix td { padding: 10px 6px; font-size: 12px; text-align: center; }
+  .perm-matrix td:first-child { text-align: left; font-weight: 500; }
+  .perm-matrix .yes { color: var(--success); font-weight: 700; }
+  .perm-matrix .no { color: var(--muted); }
+
+  /* empty state */
+  .empty-state { text-align: center; padding: 36px 24px; }
+  .empty-state .empty-icon {
+    width: 56px; height: 56px; margin: 0 auto 14px; border-radius: 50%;
+    background: var(--accent-soft); display: grid; place-items: center;
+  }
+  .empty-state .empty-icon svg { width: 26px; height: 26px; stroke: var(--accent-deep); fill: none; stroke-width: 1.6; }
+  .empty-state h3 { font-family: var(--font-display); font-size: 17px; margin: 0 0 6px; }
+  .empty-state p { color: var(--muted); font-size: 13px; margin: 0 0 16px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+  }
+</style>
+</head>
+<body>
+  <div class="stage">
+    <div class="caption"><strong>家庭物品管理系统</strong> · 可交互原型</div>
+
+    <div class="screen" data-od-id="screen">
+      <div class="statusbar">
+        <span class="num">9:41</span>
+        <span class="right">
+          <svg viewBox="0 0 17 11" aria-hidden><rect x="0" y="7" width="3" height="4" rx="0.6"/><rect x="4" y="5" width="3" height="6" rx="0.6"/><rect x="8" y="3" width="3" height="8" rx="0.6"/><rect x="12" y="0" width="3" height="11" rx="0.6"/></svg>
+          <svg viewBox="0 0 17 11" aria-hidden><path d="M8.5 1.5C5.5 1.5 2.7 2.6 0.5 4.6L2 6.1C3.8 4.5 6.1 3.6 8.5 3.6c2.4 0 4.7 0.9 6.5 2.5l1.5-1.5c-2.2-2-5-3.1-8-3.1zM3.5 7.6L5 9.1c1-0.9 2.2-1.4 3.5-1.4 1.3 0 2.5 0.5 3.5 1.4l1.5-1.5c-1.4-1.3-3.1-2-5-2-1.9 0-3.6 0.7-5 2zM6.5 10.6l2 2 2-2c-0.5-0.5-1.2-0.8-2-0.8s-1.5 0.3-2 0.8z"/></svg>
+          <svg class="battery" viewBox="0 0 25 11" aria-hidden><rect x="0.5" y="0.5" width="21" height="10" rx="2.5" fill="none" stroke="currentColor" stroke-opacity="0.45"/><rect x="22" y="3.5" width="1.5" height="4" rx="0.4" fill="currentColor" fill-opacity="0.45"/><rect x="2" y="2" width="18" height="7" rx="1.4"/></svg>
+        </span>
+      </div>
+
+      <main class="content" data-od-id="content">
+        <!-- ════════════ P1 首页 ════════════ -->
+        <section class="page active" id="page-home" data-od-id="page-home">
+          <div class="header">
+            <div>
+              <p class="greeting">8月23日 · 周日 · 家中</p>
+              <h1>家庭物品管理系统</h1>
+            </div>
+            <button class="icon-btn" aria-label="搜索" data-action="go-items">
+              <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+            </button>
+          </div>
+
+          <section class="pad" style="margin-bottom: 16px;">
+            <div class="radar-card" data-od-id="radar-card">
+              <p class="radar-title">药品临期雷达</p>
+              <p class="radar-sub">2 件药品 30 天内到期，1 件已过期</p>
+              <div class="radar-row" data-action="go-reminders">
+                <span class="r-dot" style="background:#F2C14E;"></span>
+                <span class="r-name">布洛芬缓释胶囊</span>
+                <span class="r-date">剩 6 天</span>
+              </div>
+              <div class="radar-row" data-action="go-reminders">
+                <span class="r-dot" style="background:#F2C14E;"></span>
+                <span class="r-name">维生素 C 泡腾片</span>
+                <span class="r-date">剩 24 天</span>
+              </div>
+              <div class="radar-row" data-action="go-reminders">
+                <span class="r-dot" style="background:#F06B5E;"></span>
+                <span class="r-name">感冒灵颗粒</span>
+                <span class="r-date">过期 12 天</span>
+              </div>
+            </div>
+          </section>
+
+          <section class="pad grid-2" style="margin-bottom: 16px;">
+            <button class="card row" style="gap: 12px; text-align: left; cursor: pointer; border: none; min-height: 76px;" data-action="go-scan">
+              <span style="width: 40px; height: 40px; border-radius: 12px; background: var(--accent-soft); display: grid; place-items: center; flex-shrink: 0;">
+                <svg viewBox="0 0 24 24" style="width: 20px; height: 20px; stroke: var(--accent-deep); fill: none; stroke-width: 1.7;"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+              </span>
+              <span>
+                <span style="display: block; font-weight: 600; font-size: 14px;">拍照添加</span>
+                <span class="meta" style="font-size: 11px;">拍一下自动录入</span>
+              </span>
+            </button>
+            <button class="card row" style="gap: 12px; text-align: left; cursor: pointer; border: none; min-height: 76px;" data-action="go-medicine">
+              <span style="width: 40px; height: 40px; border-radius: 12px; background: var(--accent-soft); display: grid; place-items: center; flex-shrink: 0;">
+                <svg viewBox="0 0 24 24" style="width: 20px; height: 20px; stroke: var(--accent-deep); fill: none; stroke-width: 1.7;"><path d="M10.5 20.5a6 6 0 0 1-8.5-8.5l9-9 8.5 8.5-9 9z"/><path d="M6.5 10.5h9"/></svg>
+              </span>
+              <span>
+                <span style="display: block; font-weight: 600; font-size: 14px;">扫药品</span>
+                <span class="meta" style="font-size: 11px;">自动识别效期</span>
+              </span>
+            </button>
+          </section>
+
+          <section class="pad" style="margin-bottom: 8px;">
+            <div class="row-between" style="margin-bottom: 4px;">
+              <h2 class="h3" style="font-family: var(--font-display); font-size: 18px;">最近添加</h2>
+              <button style="background: none; border: 0; color: var(--accent-deep); font-size: 13px; font-weight: 500; cursor: pointer; padding: 8px 0;" data-action="go-items">查看全部</button>
+            </div>
+            <div class="item-row" data-action="go-detail" data-item="蓝光眼镜">
+              <div class="item-thumb">
+                <svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="3"/><path d="M9 8h6M9 12h6M9 16h4"/></svg>
+              </div>
+              <div>
+                <div class="i-name">蓝光眼镜</div>
+                <div class="i-sub">书房 · 书桌抽屉 · 1 件</div>
+              </div>
+              <span class="badge ok">正常</span>
+            </div>
+            <div class="item-row" data-action="go-detail" data-item="身份证扫描件">
+              <div class="item-thumb">
+                <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M3 10h18"/></svg>
+              </div>
+              <div>
+                <div class="i-name">身份证扫描件</div>
+                <div class="i-sub">玄关 · 证件盒 · 1 件</div>
+              </div>
+              <span class="badge ok">正常</span>
+            </div>
+            <div class="item-row" data-action="go-detail" data-item="空气炸锅">
+              <div class="item-thumb">
+                <svg viewBox="0 0 24 24"><path d="M20 12v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8"/><path d="M22 7H2v5h20z"/><path d="M12 22V7"/></svg>
+              </div>
+              <div>
+                <div class="i-name">空气炸锅</div>
+                <div class="i-sub">厨房 · 吊柜下层 · 1 件</div>
+              </div>
+              <span class="badge warn">保修 9 月</span>
+            </div>
+          </section>
+        </section>
+
+        <!-- ════════════ P2 物品 ════════════ -->
+        <section class="page" id="page-items" data-od-id="page-items">
+          <div class="header">
+            <div>
+              <p class="greeting">共 42 件物品</p>
+              <h1>全部物品</h1>
+            </div>
+            <button class="icon-btn" aria-label="新增物品" data-action="go-scan">
+              <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+            </button>
+          </div>
+
+          <section class="pad" style="margin-bottom: 6px;">
+            <div style="display: flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 0 14px; min-height: 46px;">
+              <svg viewBox="0 0 24 24" style="width: 18px; height: 18px; stroke: var(--muted); fill: none; stroke-width: 1.8;"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+              <input placeholder="搜索物品、位置、备注" aria-label="搜索物品" style="border: 0; background: none; flex: 1; font: inherit; font-size: 14px; outline: none; color: var(--fg);" />
+            </div>
+          </section>
+
+          <section class="pad" style="margin-bottom: 8px;">
+            <div class="row" style="overflow-x: auto; padding-bottom: 4px;">
+              <span class="tag active">全部 42</span>
+              <span class="tag">药品 9</span>
+              <span class="tag">食品 7</span>
+              <span class="tag">家电 5</span>
+              <span class="tag">证件 4</span>
+              <span class="tag">衣物 6</span>
+              <span class="tag">其他 11</span>
+            </div>
+          </section>
+
+          <section class="pad" data-od-id="item-list">
+            <div class="item-row" data-action="go-detail" data-item="布洛芬缓释胶囊">
+              <div class="item-thumb">
+                <svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="3"/><path d="M9 8h6M9 12h6M9 16h4"/></svg>
+              </div>
+              <div>
+                <div class="i-name">布洛芬缓释胶囊</div>
+                <div class="i-sub">药箱 · 上层 · 2 盒</div>
+              </div>
+              <span class="badge danger">6 天</span>
+            </div>
+            <div class="item-row" data-action="go-detail" data-item="空气炸锅">
+              <div class="item-thumb">
+                <svg viewBox="0 0 24 24"><path d="M20 12v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8"/><path d="M22 7H2v5h20z"/><path d="M12 22V7"/></svg>
+              </div>
+              <div>
+                <div class="i-name">空气炸锅</div>
+                <div class="i-sub">厨房 · 吊柜下层 · 1 件</div>
+              </div>
+              <span class="badge warn">保修</span>
+            </div>
+            <div class="item-row" data-action="go-detail" data-item="维生素 C 泡腾片">
+              <div class="item-thumb">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+              </div>
+              <div>
+                <div class="i-name">维生素 C 泡腾片</div>
+                <div class="i-sub">客厅 · 茶几抽屉 · 1 支</div>
+              </div>
+              <span class="badge warn">24 天</span>
+            </div>
+            <div class="item-row" data-action="go-detail" data-item="电蚊香液（备用）">
+              <div class="item-thumb">
+                <svg viewBox="0 0 24 24"><path d="M21 8l-9-5-9 5v8l9 5 9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/></svg>
+              </div>
+              <div>
+                <div class="i-name">电蚊香液（备用）</div>
+                <div class="i-sub">储物间 · 收纳箱 B · 3 瓶</div>
+              </div>
+              <span class="badge ok">正常</span>
+            </div>
+            <div class="item-row" data-action="go-detail" data-item="户口本">
+              <div class="item-thumb">
+                <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M3 10h18"/></svg>
+              </div>
+              <div>
+                <div class="i-name">户口本</div>
+                <div class="i-sub">玄关 · 证件盒 · 1 本</div>
+              </div>
+              <span class="badge ok">正常</span>
+            </div>
+            <div class="item-row" data-action="go-detail" data-item="工具箱">
+              <div class="item-thumb">
+                <svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/><path d="M4 10h16M10 4v16"/></svg>
+              </div>
+              <div>
+                <div class="i-name">工具箱</div>
+                <div class="i-sub">储物间 · 工具架 · 1 套</div>
+              </div>
+              <span class="badge ok">正常</span>
+            </div>
+          </section>
+        </section>
+
+        <!-- ════════════ P3 位置 ════════════ -->
+        <section class="page" id="page-locations" data-od-id="page-locations">
+          <div class="header">
+            <div>
+              <p class="greeting">6 个房间 · 15 个收纳位</p>
+              <h1>存放位置</h1>
+            </div>
+            <button class="icon-btn" aria-label="新增位置" data-action="go-add-location">
+              <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+            </button>
+          </div>
+
+          <section class="pad stack" style="gap: 10px;">
+            <div class="loc-node open">
+              <div class="loc-head" data-role="toggle">
+                <svg class="chev" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg>
+                <span style="font-weight: 600; font-size: 14px; flex: 1;">客厅</span>
+                <span class="loc-count">7 件</span>
+              </div>
+              <div class="loc-children">
+                <div class="loc-child"><span>电视柜 · 抽屉 1</span><span class="loc-count">2 件</span></div>
+                <div class="loc-child"><span>茶几抽屉</span><span class="loc-count">3 件</span></div>
+                <div class="loc-child"><span>沙发收纳袋</span><span class="loc-count">2 件</span></div>
+              </div>
+            </div>
+
+            <div class="loc-node open">
+              <div class="loc-head" data-role="toggle">
+                <svg class="chev" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg>
+                <span style="font-weight: 600; font-size: 14px; flex: 1;">厨房</span>
+                <span class="loc-count">11 件</span>
+              </div>
+              <div class="loc-children">
+                <div class="loc-child"><span>吊柜上层</span><span class="loc-count">4 件</span></div>
+                <div class="loc-child"><span>吊柜下层</span><span class="loc-count">5 件</span></div>
+                <div class="loc-child"><span>米面收纳桶</span><span class="loc-count">2 件</span></div>
+              </div>
+            </div>
+
+            <div class="loc-node">
+              <div class="loc-head" data-role="toggle">
+                <svg class="chev" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg>
+                <span style="font-weight: 600; font-size: 14px; flex: 1;">卧室</span>
+                <span class="loc-count">6 件</span>
+              </div>
+              <div class="loc-children">
+                <div class="loc-child"><span>衣柜 · 顶层</span><span class="loc-count">3 件</span></div>
+                <div class="loc-child"><span>床头柜抽屉</span><span class="loc-count">3 件</span></div>
+              </div>
+            </div>
+
+            <div class="loc-node">
+              <div class="loc-head" data-role="toggle">
+                <svg class="chev" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg>
+                <span style="font-weight: 600; font-size: 14px; flex: 1;">药箱</span>
+                <span class="loc-count">9 件</span>
+              </div>
+              <div class="loc-children">
+                <div class="loc-child"><span>上层（常用药）</span><span class="loc-count">5 件</span></div>
+                <div class="loc-child"><span>下层（备用）</span><span class="loc-count">4 件</span></div>
+              </div>
+            </div>
+
+            <div class="loc-node">
+              <div class="loc-head" data-role="toggle">
+                <svg class="chev" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg>
+                <span style="font-weight: 600; font-size: 14px; flex: 1;">储物间</span>
+                <span class="loc-count">6 件</span>
+              </div>
+              <div class="loc-children">
+                <div class="loc-child"><span>收纳箱 B</span><span class="loc-count">3 件</span></div>
+                <div class="loc-child"><span>工具架</span><span class="loc-count">3 件</span></div>
+              </div>
+            </div>
+
+            <div class="loc-node">
+              <div class="loc-head" data-role="toggle">
+                <svg class="chev" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg>
+                <span style="font-weight: 600; font-size: 14px; flex: 1;">玄关</span>
+                <span class="loc-count">3 件</span>
+              </div>
+              <div class="loc-children">
+                <div class="loc-child"><span>证件盒</span><span class="loc-count">3 件</span></div>
+              </div>
+            </div>
+          </section>
+        </section>
+
+        <!-- ════════════ P4 提醒 ════════════ -->
+        <section class="page" id="page-reminders" data-od-id="page-reminders">
+          <div class="header">
+            <div>
+              <p class="greeting">3 条待处理</p>
+              <h1>提醒中心</h1>
+            </div>
+          </div>
+
+          <section class="pad" style="margin-bottom: 8px;">
+            <div class="row" style="overflow-x: auto; padding-bottom: 4px;">
+              <span class="tag active">药品效期</span>
+              <span class="tag">保修到期</span>
+              <span class="tag">借出归还</span>
+              <span class="tag">已处理</span>
+            </div>
+          </section>
+
+          <section class="pad stack" style="gap: 12px;">
+            <div class="card" style="border-left: 0;">
+              <div class="row-between" style="margin-bottom: 10px;">
+                <span class="pill" style="background: var(--danger-soft); color: var(--danger);">已过期</span>
+                <span class="meta">需处理</span>
+              </div>
+              <div class="row" style="gap: 12px;">
+                <div class="item-thumb" style="width: 44px; height: 44px;">
+                  <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M3 10h18"/></svg>
+                </div>
+                <div style="flex: 1;">
+                  <div style="font-weight: 600; font-size: 14px;">感冒灵颗粒</div>
+                  <div class="meta" style="font-size: 11px;">药箱·上层 · 已于 8 月 11 日过期</div>
+                </div>
+              </div>
+              <div class="row" style="gap: 8px; margin-top: 12px;">
+                <button class="btn-secondary" style="min-height: 40px; font-size: 13px; flex: 1;" data-toast="已标记为处理">已处理</button>
+                <button class="btn-secondary" style="min-height: 40px; font-size: 13px; flex: 1;" data-action="go-detail">查看</button>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="row-between" style="margin-bottom: 10px;">
+                <span class="pill" style="background: var(--warn-soft); color: var(--warn);">30 天内</span>
+                <span class="meta">2 件</span>
+              </div>
+              <div class="row" style="gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border);">
+                <div class="item-thumb" style="width: 44px; height: 44px;">
+                  <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+                </div>
+                <div style="flex: 1;">
+                  <div style="font-weight: 600; font-size: 14px;">布洛芬缓释胶囊</div>
+                  <div class="meta" style="font-size: 11px;">药箱·上层 · 有效期至 8 月 29 日</div>
+                </div>
+                <span class="num" style="color: var(--warn); font-weight: 600;">6 天</span>
+              </div>
+              <div class="row" style="gap: 12px; padding: 8px 0;">
+                <div class="item-thumb" style="width: 44px; height: 44px;">
+                  <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+                </div>
+                <div style="flex: 1;">
+                  <div style="font-weight: 600; font-size: 14px;">维生素 C 泡腾片</div>
+                  <div class="meta" style="font-size: 11px;">客厅·茶几抽屉 · 有效期至 9 月 16 日</div>
+                </div>
+                <span class="num" style="color: var(--warn); font-weight: 600;">24 天</span>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="row-between" style="margin-bottom: 10px;">
+                <span class="pill">保修</span>
+                <span class="meta">1 件</span>
+              </div>
+              <div class="row" style="gap: 12px;">
+                <div class="item-thumb" style="width: 44px; height: 44px;">
+                  <svg viewBox="0 0 24 24"><path d="M20 12v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8"/><path d="M22 7H2v5h20z"/><path d="M12 22V7"/></svg>
+                </div>
+                <div style="flex: 1;">
+                  <div style="font-weight: 600; font-size: 14px;">空气炸锅</div>
+                  <div class="meta" style="font-size: 11px;">厨房·吊柜下层 · 保修至 2027 年 5 月</div>
+                </div>
+                <span class="num" style="color: var(--warn); font-weight: 600;">9 月</span>
+              </div>
+            </div>
+
+            <div class="empty-state">
+              <div class="empty-icon">
+                <svg viewBox="0 0 24 24"><path d="M12 3l8 4v5c0 4.5-3.2 7.8-8 9-4.8-1.2-8-4.5-8-9V7z"/><path d="M9 12l2 2 4-4"/></svg>
+              </div>
+              <h3>暂无外借物品</h3>
+              <p>把借给邻居的东西记一笔，到期自动提醒归还。</p>
+            </div>
+          </section>
+        </section>
+
+        <!-- ════════════ P5 我的 ════════════ -->
+        <section class="page" id="page-profile" data-od-id="page-profile">
+          <div class="header">
+            <div>
+              <p class="greeting">熊家 · 4 位成员</p>
+              <h1>我的</h1>
+            </div>
+            <button class="icon-btn" aria-label="设置">
+              <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+            </button>
+          </div>
+
+          <section class="pad" style="margin-bottom: 16px;">
+            <div class="card row" style="gap: 14px;">
+              <div style="width: 56px; height: 56px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), var(--accent-deep)); display: grid; place-items: center; color: #fff; font-family: var(--font-display); font-size: 22px; flex-shrink: 0;" id="self-card-initial">王</div>
+              <div style="flex: 1;">
+                <div style="font-weight: 600; font-size: 16px;" id="self-card-name">王建国 <span class="role-badge admin" style="margin-left: 6px;">管理员</span></div>
+                <div class="meta" style="font-size: 12px; margin-top: 3px;" id="self-card-sub">家 · 爸爸 · 拥有全部权限</div>
+              </div>
+            </div>
+          </section>
+
+          <section class="pad stack" style="gap: 10px;">
+            <div class="card flat row-between" style="cursor: pointer;" data-action="go-members">
+              <span style="display: flex; align-items: center; gap: 10px;">
+                <svg viewBox="0 0 24 24" style="width: 19px; height: 19px; stroke: var(--muted); fill: none; stroke-width: 1.7;"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.5 3-6 6.5-6s6.5 2.5 6.5 6"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18.5 14.5c2 1 3.5 2.8 3.5 5.5"/></svg>
+                家庭与成员
+              </span>
+              <span class="meta" data-family-members-count>4 人 ›</span>
+            </div>
+            <div class="card flat row-between">
+              <span style="display: flex; align-items: center; gap: 10px;">
+                <svg viewBox="0 0 24 24" style="width: 19px; height: 19px; stroke: var(--muted); fill: none; stroke-width: 1.7;"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+                通知设置
+              </span>
+              <div class="switch">
+                <input type="checkbox" id="notif-switch" checked aria-label="开启通知" />
+                <label class="track" for="notif-switch"></label>
+              </div>
+            </div>
+            <div class="card flat row-between">
+              <span style="display: flex; align-items: center; gap: 10px;">
+                <svg viewBox="0 0 24 24" style="width: 19px; height: 19px; stroke: var(--muted); fill: none; stroke-width: 1.7;"><path d="M21 12a9 9 0 1 1-9-9"/><path d="M21 3v6h-6"/><path d="M12 7v5l3 3"/></svg>
+                数据同步
+              </span>
+              <span class="meta">刚刚同步</span>
+            </div>
+            <div class="card flat row-between">
+              <span style="display: flex; align-items: center; gap: 10px;">
+                <svg viewBox="0 0 24 24" style="width: 19px; height: 19px; stroke: var(--muted); fill: none; stroke-width: 1.7;"><path d="M12 3l8 4v5c0 4.5-3.2 7.8-8 9-4.8-1.2-8-4.5-8-9V7z"/><path d="M9.5 12l2 2 3.5-4"/></svg>
+                隐私与安全
+              </span>
+              <span class="meta">›</span>
+            </div>
+            <div class="card flat row-between">
+              <span style="display: flex; align-items: center; gap: 10px;">
+                <svg viewBox="0 0 24 24" style="width: 19px; height: 19px; stroke: var(--muted); fill: none; stroke-width: 1.7;"><path d="M4 4h16v16H4z"/><path d="M4 10h16M10 4v16"/></svg>
+                数据导出
+              </span>
+              <span class="meta">›</span>
+            </div>
+          </section>
+        </section>
+
+        <!-- ════════════ F1 拍照添加（取景） ════════════ -->
+        <section class="page" id="page-scan" data-od-id="page-scan">
+          <div class="flow-bar">
+            <button class="back-btn" aria-label="返回" data-action="go-home"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>
+            <div class="flow-title">拍照添加物品</div>
+            <div class="progress-dots" style="margin: 0 0 0 auto; gap: 4px;"><span class="on"></span><span></span><span></span></div>
+          </div>
+
+          <section class="pad" style="padding-top: 4px;">
+            <div class="camera-view" data-od-id="camera-preview">
+              <div class="frame-line"></div>
+              <div class="scan-tip">
+                将物品完整放入取景框
+                <span class="mono">建议：平放拍摄，光线充足</span>
+              </div>
+            </div>
+          </section>
+
+          <section class="pad" style="padding: 18px 20px; text-align: center;">
+            <button class="shutter-btn" aria-label="拍摄" id="shutter-scan"></button>
+            <p class="meta" style="margin-top: 10px;">拍摄后将自动识别物品信息</p>
+          </section>
+        </section>
+
+        <!-- ════════════ F2 拍照添加（识别中） ════════════ -->
+        <section class="page" id="page-scanning" data-od-id="page-scanning">
+          <div class="flow-bar">
+            <button class="back-btn" aria-label="返回" data-action="go-scan"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>
+            <div class="flow-title">智能识别中</div>
+            <div class="progress-dots" style="margin: 0 0 0 auto; gap: 4px;"><span class="on"></span><span class="on"></span><span></span></div>
+          </div>
+
+          <section class="pad stack" style="gap: 14px;">
+            <div class="ph-img square" style="aspect-ratio: 4/3; max-height: 260px; width: 100%;">
+              <div style="text-align: center;">
+                <div class="skeleton" style="width: 140px; height: 14px; margin: 0 auto 10px;"></div>
+                <div class="skeleton" style="width: 90px; height: 10px; margin: 0 auto;"></div>
+              </div>
+            </div>
+            <div style="text-align: center;">
+              <div class="skeleton" style="width: 160px; height: 16px; margin: 0 auto 8px;"></div>
+              <div class="skeleton" style="width: 220px; height: 12px; margin: 0 auto;"></div>
+            </div>
+            <p class="meta" style="text-align: center; margin-top: 4px;">正在识别名称、分类与存放建议…</p>
+            <button class="btn-secondary" style="min-height: 44px; font-size: 13px;" data-action="go-scan-error">识别失败？手动填写</button>
+          </section>
+        </section>
+
+        <!-- ════════════ F2b 拍照添加（识别失败） ════════════ -->
+        <section class="page" id="page-scan-error" data-od-id="page-scan-error">
+          <div class="flow-bar">
+            <button class="back-btn" aria-label="返回" data-action="go-scan"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>
+            <div class="flow-title">识别失败</div>
+          </div>
+
+          <section class="pad" style="padding-top: 24px;">
+            <div class="empty-state">
+              <div class="empty-icon">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>
+              </div>
+              <h3>没有识别出这件物品</h3>
+              <p>可能是光线不足或物品反光。可以重新拍一张，或手动填写信息。</p>
+              <div class="stack" style="gap: 10px;">
+                <button class="btn-primary" data-action="go-scan">重新拍摄</button>
+                <button class="btn-secondary" data-action="go-scan-confirm">手动填写</button>
+              </div>
+            </div>
+          </section>
+        </section>
+
+        <!-- ════════════ F3 拍照添加（确认表单） ════════════ -->
+        <section class="page" id="page-scan-confirm" data-od-id="page-scan-confirm">
+          <div class="flow-bar">
+            <button class="back-btn" aria-label="返回" data-action="go-scanning"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>
+            <div class="flow-title">确认物品信息</div>
+            <div class="progress-dots" style="margin: 0 0 0 auto; gap: 4px;"><span class="on"></span><span class="on"></span><span class="on"></span></div>
+          </div>
+
+          <section class="pad" style="padding-top: 4px;">
+            <div class="row" style="gap: 14px; align-items: flex-start; margin-bottom: 18px;">
+              <div class="ph-img square" style="width: 76px; height: 76px; border-radius: 14px; flex-shrink: 0;"></div>
+              <div style="flex: 1;">
+                <div style="font-size: 13px; color: var(--muted); margin-bottom: 4px;">识别结果 · 置信度 96%</div>
+                <div style="font-weight: 600; font-size: 16px;">蓝牙耳机（白色）</div>
+                <div style="font-size: 12px; color: var(--muted); margin-top: 4px;">可编辑下方字段后保存</div>
+              </div>
+            </div>
+
+            <div class="field">
+              <label for="f-name">物品名称</label>
+              <div class="input editable" id="f-name" contenteditable="true" role="textbox" aria-multiline="false">蓝牙耳机（白色）</div>
+              <div class="hint"><span class="conf">✓ 已识别</span> · 点击可修改</div>
+            </div>
+
+            <div class="field">
+              <label>分类</label>
+              <div class="row" style="gap: 8px; flex-wrap: wrap;">
+                <span class="tag active">数码 3C</span>
+                <span class="tag">药品</span>
+                <span class="tag">食品</span>
+                <span class="tag">其他</span>
+              </div>
+            </div>
+
+            <div class="field">
+              <label for="f-loc">存放位置</label>
+              <div class="input editable" id="f-loc" contenteditable="true" role="textbox" aria-multiline="false">卧室 · 床头柜抽屉</div>
+              <div class="hint"><span class="conf">✓ 智能建议</span> · 也可从位置列表选择</div>
+            </div>
+
+            <div class="grid-2">
+              <div class="field">
+                <label for="f-qty">数量</label>
+                <div class="input editable" id="f-qty" contenteditable="true" role="textbox" aria-multiline="false">1</div>
+              </div>
+              <div class="field">
+                <label for="f-tag">标签</label>
+                <div class="input editable" id="f-tag" contenteditable="true" role="textbox" aria-multiline="false">常用</div>
+              </div>
+            </div>
+          </section>
+
+          <section class="pad" style="padding-top: 8px;">
+            <button class="btn-primary" id="save-item" data-toast="已加入物品库">保存到物品库</button>
+          </section>
+        </section>
+
+        <!-- ════════════ F4 药品扫描（取景） ════════════ -->
+        <section class="page" id="page-medicine" data-od-id="page-medicine">
+          <div class="flow-bar">
+            <button class="back-btn" aria-label="返回" data-action="go-home"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>
+            <div class="flow-title">药品效期扫描</div>
+            <div class="progress-dots" style="margin: 0 0 0 auto; gap: 4px;"><span class="on"></span><span></span><span></span></div>
+          </div>
+
+          <section class="pad" style="padding-top: 4px;">
+            <div class="camera-view" data-od-id="medicine-camera">
+              <div class="frame-line"></div>
+              <div class="scan-tip">
+                对准药品包装上的日期区域
+                <span class="mono">识别范围：生产日期 / 有效期至 / 批号</span>
+              </div>
+            </div>
+          </section>
+
+          <section class="pad" style="padding: 18px 20px; text-align: center;">
+            <button class="shutter-btn" aria-label="拍摄" id="shutter-med"></button>
+            <p class="meta" style="margin-top: 10px;">自动识别并填入效期信息</p>
+          </section>
+        </section>
+
+        <!-- ════════════ F5 药品扫描（识别中） ════════════ -->
+        <section class="page" id="page-medicine-scanning" data-od-id="page-medicine-scanning">
+          <div class="flow-bar">
+            <button class="back-btn" aria-label="返回" data-action="go-medicine"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>
+            <div class="flow-title">识别药品信息</div>
+            <div class="progress-dots" style="margin: 0 0 0 auto; gap: 4px;"><span class="on"></span><span class="on"></span><span></span></div>
+          </div>
+
+          <section class="pad stack" style="gap: 14px;">
+            <div class="ph-img square" style="aspect-ratio: 4/3; max-height: 240px; width: 100%;">
+              <div style="text-align: center;">
+                <div class="skeleton" style="width: 120px; height: 14px; margin: 0 auto 10px;"></div>
+                <div class="skeleton" style="width: 180px; height: 10px; margin: 0 auto;"></div>
+              </div>
+            </div>
+            <div style="text-align: center;">
+              <div class="skeleton" style="width: 140px; height: 14px; margin: 0 auto 8px;"></div>
+              <div class="skeleton" style="width: 200px; height: 11px; margin: 0 auto;"></div>
+            </div>
+            <p class="meta" style="text-align: center;">正在识别：药品名称、生产日期、有效期、批号…</p>
+            <button class="btn-secondary" style="min-height: 44px; font-size: 13px;" data-action="go-medicine-error">识别失败？手动填写</button>
+          </section>
+        </section>
+
+        <!-- ════════════ F5b 药品扫描（识别失败） ════════════ -->
+        <section class="page" id="page-medicine-error" data-od-id="page-medicine-error">
+          <div class="flow-bar">
+            <button class="back-btn" aria-label="返回" data-action="go-medicine"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>
+            <div class="flow-title">识别失败</div>
+          </div>
+
+          <section class="pad" style="padding-top: 24px;">
+            <div class="empty-state">
+              <div class="empty-icon">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>
+              </div>
+              <h3>没有读出药品效期</h3>
+              <p>请确保日期区域清晰可见、无遮挡。也可以手动填写生产日期与有效期。</p>
+              <div class="stack" style="gap: 10px;">
+                <button class="btn-primary" data-action="go-medicine">重新拍摄</button>
+                <button class="btn-secondary" data-action="go-medicine-confirm">手动填写</button>
+              </div>
+            </div>
+          </section>
+        </section>
+
+        <!-- ════════════ F6 药品扫描（OCR 结果确认） ════════════ -->
+        <section class="page" id="page-medicine-confirm" data-od-id="page-medicine-confirm">
+          <div class="flow-bar">
+            <button class="back-btn" aria-label="返回" data-action="go-medicine-scanning"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>
+            <div class="flow-title">确认药品效期</div>
+            <div class="progress-dots" style="margin: 0 0 0 auto; gap: 4px;"><span class="on"></span><span class="on"></span><span class="on"></span></div>
+          </div>
+
+          <section class="pad" style="padding-top: 4px;">
+            <div class="row" style="gap: 14px; align-items: flex-start; margin-bottom: 18px;">
+              <div class="ph-img square" style="width: 76px; height: 76px; border-radius: 14px; flex-shrink: 0;"></div>
+              <div style="flex: 1;">
+                <div style="font-size: 13px; color: var(--muted); margin-bottom: 4px;">药品识别 · 置信度 92%</div>
+                <div style="font-weight: 600; font-size: 16px;">布洛芬缓释胶囊</div>
+                <div style="font-size: 12px; color: var(--muted); margin-top: 4px;">效期字段已自动填写，请核对</div>
+              </div>
+            </div>
+
+            <div class="field">
+              <label for="m-name">药品名称</label>
+              <div class="input editable" id="m-name" contenteditable="true" role="textbox" aria-multiline="false">布洛芬缓释胶囊</div>
+              <div class="hint"><span class="conf">✓ 已识别</span></div>
+            </div>
+
+            <div class="field">
+              <label for="m-prod">生产日期</label>
+              <div class="input editable" id="m-prod" contenteditable="true" role="textbox" aria-multiline="false">2025-03-12</div>
+              <div class="hint"><span class="conf">✓ 已识别</span> · 来自包装印刷日期</div>
+            </div>
+
+            <div class="field">
+              <label for="m-exp">有效期至</label>
+              <div class="input editable" id="m-exp" contenteditable="true" role="textbox" aria-multiline="false">2026-08-29</div>
+              <div class="hint"><span class="conf">✓ 已识别</span> · 将自动加入临期提醒（提前 30 天）</div>
+            </div>
+
+            <div class="field">
+              <label for="m-batch">批号</label>
+              <div class="input editable" id="m-batch" contenteditable="true" role="textbox" aria-multiline="false">250312A</div>
+              <div class="hint"><span class="conf">✓ 已识别</span></div>
+            </div>
+
+            <div class="field">
+              <label>存放位置</label>
+              <div class="row" style="gap: 8px; flex-wrap: wrap;">
+                <span class="tag active">药箱 · 上层</span>
+                <span class="tag">药箱 · 下层</span>
+                <span class="tag">其他位置</span>
+              </div>
+            </div>
+          </section>
+
+          <section class="pad" style="padding-top: 8px;">
+            <button class="btn-primary" id="save-medicine" data-toast="已加入药品库并挂提醒">保存并加入提醒</button>
+          </section>
+        </section>
+
+        <!-- ════════════ F7 物品详情 ════════════ -->
+        <section class="page" id="page-detail" data-od-id="page-detail">
+          <div class="flow-bar">
+            <button class="back-btn" aria-label="返回" data-action="go-items"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>
+            <div class="flow-title">物品详情</div>
+          </div>
+
+          <section class="pad" style="padding-top: 4px;">
+            <div class="ph-img wide" style="aspect-ratio: 16/10; border-radius: 18px;"></div>
+          </section>
+
+          <section class="pad" style="padding-top: 16px;">
+            <div class="row-between">
+              <h1 class="h2" id="dt-name">布洛芬缓释胶囊</h1>
+              <span class="badge danger" id="dt-badge">剩 6 天</span>
+            </div>
+            <p class="meta" style="margin-top: 4px;" id="dt-meta">药品 · 添加于 2025-03-12 · @m1</p>
+          </section>
+
+          <section class="pad stack" style="gap: 10px; margin-top: 14px;">
+            <div class="card flat row-between">
+              <span style="color: var(--muted);">存放位置</span>
+              <span style="font-weight: 500;" id="dt-loc">药箱 · 上层</span>
+            </div>
+            <div class="card flat row-between">
+              <span style="color: var(--muted);">数量</span>
+              <span class="num" style="font-weight: 500;" id="dt-qty">2 盒</span>
+            </div>
+            <div class="card flat row-between">
+              <span style="color: var(--muted);">生产日期</span>
+              <span class="num" id="dt-prod">2025-03-12</span>
+            </div>
+            <div class="card flat row-between">
+              <span style="color: var(--muted);">有效期至</span>
+              <span class="num" style="color: var(--danger); font-weight: 600;" id="dt-exp">2026-08-29</span>
+            </div>
+            <div class="card flat row-between">
+              <span style="color: var(--muted);">批号</span>
+              <span class="num" id="dt-batch">250312A</span>
+            </div>
+            <div class="card flat row-between">
+              <span style="color: var(--muted);">标签</span>
+              <span id="dt-tags"><span class="tag" style="margin-right: 6px;">常用</span><span class="tag">需冷藏?</span></span>
+            </div>
+            <div class="card flat" style="border-top: 1px solid var(--border);">
+              <div style="color: var(--muted); margin-bottom: 6px;">备注</div>
+              <div style="font-size: 13px;" id="dt-note">饭后服用，开封后 6 个月内用完。备用药，注意别让小朋友拿到。</div>
+            </div>
+          </section>
+
+          <section class="pad stack" style="gap: 10px; margin-top: 16px;">
+            <button class="btn-primary" data-action="go-home" data-toast="已更新">编辑物品</button>
+            <button class="btn-secondary" style="color: var(--danger);" data-toast="已删除">删除物品</button>
+            <p class="meta" style="text-align: center;">管理员与成员可编辑 · 访客只读</p>
+          </section>
+        </section>
+
+        <!-- ════════════ F8 成员与权限 ════════════ -->
+        <section class="page" id="page-members" data-od-id="page-members">
+          <div class="flow-bar">
+            <button class="back-btn" aria-label="返回" data-action="go-profile"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>
+            <div class="flow-title">家庭与成员</div>
+          </div>
+
+          <section class="pad" style="padding-top: 8px; margin-bottom: 12px;">
+            <div class="card" style="background: var(--accent); border-color: transparent; color: #fff;">
+              <div class="row-between">
+                <div>
+                  <div style="font-family: var(--font-display); font-size: 17px; display: flex; align-items: center; gap: 8px;">
+                    <span id="family-name">熊家</span>
+                    <button aria-label="编辑家庭名" data-action="edit-family-name" style="background: rgba(255,255,255,0.2); border: 0; color: #fff; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; cursor: pointer; flex-shrink: 0;"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></button>
+                  </div>
+                  <div style="font-size: 12px; opacity: 0.8; margin-top: 3px;" id="member-count-note">创建于 2024 年 · 4 位成员</div>
+                </div>
+                <span class="pill" style="background: rgba(255,255,255,0.2); color: #fff;">家庭版</span>
+              </div>
+            </div>
+          </section>
+
+          <section class="pad" style="margin-bottom: 6px;">
+            <div class="row-between" style="margin-bottom: 8px;">
+              <h3 class="h3" style="font-family: var(--font-display); font-size: 17px;">成员列表</h3>
+              <button style="background: none; border: 0; color: var(--accent-deep); font-size: 13px; font-weight: 500; cursor: pointer; padding: 8px 0;" data-action="add-member" aria-label="添加成员">+ 添加成员</button>
+            </div>
+
+            <div class="card" style="padding: 6px 16px;">
+              <div id="member-list"></div>
+            </div>
+          </section>
+
+          <section class="pad" style="margin-bottom: 6px;">
+            <h3 class="h3" style="font-family: var(--font-display); font-size: 17px; margin-bottom: 8px;">权限说明</h3>
+            <div class="card" style="overflow-x: auto; padding: 10px 16px;">
+              <table class="perm-matrix" style="width: 100%; border-collapse: collapse;">
+                <tr><td></td><td style="color: var(--accent-deep); font-weight: 600;">管理员</td><td style="color: var(--accent-deep); font-weight: 600;">成员</td><td style="color: var(--muted); font-weight: 600;">访客</td></tr>
+                <tr><td>查询</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+                <tr><td>添加</td><td class="yes">✓</td><td class="yes">✓</td><td class="no">—</td></tr>
+                <tr><td>编辑维护</td><td class="yes">✓</td><td class="yes">✓</td><td class="no">—</td></tr>
+                <tr><td>删除</td><td class="yes">✓</td><td class="no">—</td><td class="no">—</td></tr>
+                <tr><td>位置管理</td><td class="yes">✓</td><td class="yes">✓</td><td class="no">—</td></tr>
+                <tr><td>成员权限</td><td class="yes">✓</td><td class="no">—</td><td class="no">—</td></tr>
+              </table>
+            </div>
+          </section>
+
+          <section class="pad" style="margin-bottom: 6px;">
+            <div class="row-between" style="margin-bottom: 8px;">
+              <h3 class="h3" style="font-family: var(--font-display); font-size: 17px;" id="perm-member-name">成员权限（王小满）</h3>
+              <span class="role-badge member" id="perm-member-role">成员</span>
+            </div>
+            <div class="card" style="padding: 4px 16px;">
+              <div class="card flat row-between" style="border-top: 0;">
+                <span style="font-size: 14px;">允许添加物品</span>
+                <div class="switch"><input type="checkbox" id="perm-add" checked aria-label="允许添加物品"/><label class="track" for="perm-add"></label></div>
+              </div>
+              <div class="card flat row-between">
+                <span style="font-size: 14px;">允许编辑物品</span>
+                <div class="switch"><input type="checkbox" id="perm-edit" checked aria-label="允许编辑物品"/><label class="track" for="perm-edit"></label></div>
+              </div>
+              <div class="card flat row-between">
+                <span style="font-size: 14px;">允许删除物品</span>
+                <div class="switch"><input type="checkbox" id="perm-del" aria-label="允许删除物品"/><label class="track" for="perm-del"></label></div>
+              </div>
+              <div class="card flat row-between" style="border-bottom: 0;">
+                <span style="font-size: 14px;">允许管理位置</span>
+                <div class="switch"><input type="checkbox" id="perm-loc" checked aria-label="允许管理位置"/><label class="track" for="perm-loc"></label></div>
+              </div>
+            </div>
+            <p class="meta" style="margin-top: 8px;">调整即时生效，家庭成员将收到通知</p>
+          </section>
+        </section>
+
+        <!-- ════════════ F8b 成员编辑（sheet） ════════════ -->
+        <section class="page" id="page-member-edit" data-od-id="page-member-edit">
+          <div class="flow-bar">
+            <button class="back-btn" aria-label="返回" data-action="go-members"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>
+            <div class="flow-title" id="member-edit-title">编辑成员</div>
+          </div>
+
+          <section class="pad" style="padding-top: 8px;">
+            <div style="display: flex; align-items: center; gap: 14px; margin-bottom: 16px;">
+              <div id="member-edit-avatar" style="width: 56px; height: 56px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), var(--accent-deep)); color: #fff; display: grid; place-items: center; font-family: var(--font-display); font-size: 22px; flex-shrink: 0;">王</div>
+              <div style="flex: 1;">
+                <div style="font-weight: 500; font-size: 15px;" id="member-edit-name-preview">王建国</div>
+                <div class="meta" style="font-size: 12px;">头像自动取姓名首字</div>
+              </div>
+              <span class="pill" style="background: color-mix(in oklch, var(--accent) 12%, transparent); color: var(--accent-deep);" id="member-edit-role-bound">成员</span>
+            </div>
+
+            <div class="field">
+              <label for="member-name">姓名</label>
+              <div class="input editable" id="member-name" contenteditable="true" role="textbox" aria-multiline="false"></div>
+            </div>
+            <div class="field">
+              <label for="member-rel">关系</label>
+              <div class="input editable" id="member-rel" contenteditable="true" role="textbox" aria-multiline="false"></div>
+            </div>
+            <div class="field">
+              <label>角色</label>
+              <div class="row" style="gap: 8px; flex-wrap: wrap;" id="member-role-options">
+                <span class="tag" data-role="admin">管理员</span>
+                <span class="tag" data-role="member">成员</span>
+                <span class="tag" data-role="guest">访客</span>
+              </div>
+              <p class="meta" style="margin-top: 6px;" id="role-hint">全部权限（增删改查 + 成员管理）</p>
+            </div>
+          </section>
+
+          <section class="pad" style="padding-top: 8px;">
+            <button class="btn-primary" data-action="save-member">保存成员</button>
+            <button class="btn-secondary" style="min-height: 44px; font-size: 13px; flex: 1; margin-top: 8px; width: 100%;" data-action="delete-member" id="delete-member-btn">删除此成员</button>
+          </section>
+        </section>
+
+        <!-- ════════════ F8c 编辑家庭名（sheet） ════════════ -->
+        <section class="page" id="page-family-name" data-od-id="page-family-name">
+          <div class="flow-bar">
+            <button class="back-btn" aria-label="返回" data-action="go-members"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>
+            <div class="flow-title">家庭名称</div>
+          </div>
+
+          <section class="pad" style="padding-top: 8px;">
+            <div class="field">
+              <label for="family-name-input">家庭名称</label>
+              <div class="input editable" id="family-name-input" contenteditable="true" role="textbox" aria-multiline="false"></div>
+            </div>
+            <p class="meta" style="margin-top: 8px;">修改后，首页问候与家庭信息卡会同步更新。</p>
+          </section>
+
+          <section class="pad" style="padding-top: 8px;">
+            <button class="btn-primary" data-action="save-family-name">保存名称</button>
+          </section>
+        </section>
+
+                <!-- ════════════ F9 新增位置（sheet） ════════════ -->
+        <section class="page" id="page-add-location" data-od-id="page-add-location">
+          <div class="flow-bar">
+            <button class="back-btn" aria-label="返回" data-action="go-locations"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>
+            <div class="flow-title">新增存放位置</div>
+          </div>
+
+          <section class="pad" style="padding-top: 8px;">
+            <div class="field">
+              <label for="loc-name">位置名称</label>
+              <div class="input editable" id="loc-name" contenteditable="true" role="textbox" aria-multiline="false">阳台 · 收纳柜</div>
+            </div>
+            <div class="field">
+              <label>上级位置</label>
+              <div class="row" style="gap: 8px; flex-wrap: wrap;">
+                <span class="tag active">无（作为房间）</span>
+                <span class="tag">客厅</span>
+                <span class="tag">厨房</span>
+                <span class="tag">卧室</span>
+              </div>
+            </div>
+            <div class="field">
+              <label for="loc-note">备注（可选）</label>
+              <div class="input editable" id="loc-note" contenteditable="true" role="textbox" aria-multiline="false">放清洁用品和工具箱</div>
+            </div>
+          </section>
+
+          <section class="pad" style="padding-top: 8px;">
+            <button class="btn-primary" data-action="go-locations" data-toast="位置已创建">创建位置</button>
+          </section>
+        </section>
+      </main>
+
+      <nav class="tabbar" style="--tabs: 5;" data-od-id="tabbar">
+        <button class="tab active" data-tab="page-home" aria-label="首页">
+          <svg viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9.5h13V10"/></svg>
+          首页
+        </button>
+        <button class="tab" data-tab="page-items" aria-label="物品">
+          <svg viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg>
+          物品
+        </button>
+        <button class="tab" data-tab="page-locations" aria-label="位置">
+          <svg viewBox="0 0 24 24"><path d="M3 9 12 4l9 5-9 5z"/><path d="M3 9v6l9 5 9-5V9"/><path d="M12 14v6"/></svg>
+          位置
+        </button>
+        <button class="tab" data-tab="page-reminders" aria-label="提醒">
+          <svg viewBox="0 0 24 24"><path d="M12 3a7 7 0 0 0-7 7v4l-2 3h18l-2-3v-4a7 7 0 0 0-7-7z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg>
+          提醒
+        </button>
+        <button class="tab" data-tab="page-profile" aria-label="我的">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-7 8-7s8 3 8 7"/></svg>
+          我的
+        </button>
+      </nav>
+
+      <div class="toast" id="toast" role="status" aria-live="polite"></div>
+      <div class="home-indicator" aria-hidden></div>
+    </div>
+  </div>
+
+<script>
+(function () {
+  'use strict';
+
+  var pages = document.querySelectorAll('.page');
+  var tabs = document.querySelectorAll('.tabbar .tab');
+  var toastEl = document.getElementById('toast');
+  var toastTimer = null;
+  var inFlow = false;
+
+  /* ── 家庭成员数据（可编辑 + localStorage 持久化） ── */
+  var MEMBERS_KEY = 'FAMILY_MEMBERS_V1';
+  var SELF_ID = 'm1'; // 当前登录人的稳定 id（自我判定用 id，改名后仍不变）
+  var SELF_NAME = '王建国'; // 当前登录人展示名（原型演示设定，我的页头像对应）
+  var FAMILY_DEFAULT = '熊家';
+  function familyName(seed) {
+    try { var v = localStorage.getItem('FAMILY_KEY'); if (v) return v; } catch (e) {}
+    return FAMILY_DEFAULT;
+  }
+  function setFamilyName(v) {
+    try { localStorage.setItem('FAMILY_KEY', v); } catch (e) {}
+  }
+  var ROLE_TEXT = { admin: '管理员', member: '成员', guest: '访客' };
+  var ROLE_CLASS = { admin: 'admin', member: 'member', guest: 'guest' };
+  var ROLE_GRADIENT = {
+    admin: 'linear-gradient(135deg, #5F7F5A, #46613F)',
+    member: 'linear-gradient(135deg, #6FA0B9, #4A7A92)',
+    guest: 'linear-gradient(135deg, #C7C2B6, #9A948A)'
+  };
+  var ROLE_HINT = { admin: '全部权限（增删改查 + 成员管理）', member: '增改查（不可删、不可管权限）', guest: '仅查看' };
+  var DEFAULT_MEMBERS = [
+    { id: 'm1', name: '王建国', rel: '爸爸', role: 'admin' },
+    { id: 'm2', name: '李慧', rel: '妈妈', role: 'admin' },
+    { id: 'm3', name: '王小满', rel: '儿子', role: 'member' },
+    { id: 'm4', name: '王奶奶', rel: '奶奶', role: 'guest' }
+  ];
+  // 访客固定只读权限矩阵：查询✓添加—编辑—删除—位置—成员权限—
+  var ROLE_PERMS = {
+    admin: { query: true, add: true, edit: true, del: true, loc: true, perm: true },
+    member: { query: true, add: true, edit: true, del: false, loc: true, perm: false },
+    guest: { query: true, add: false, edit: false, del: false, loc: false, perm: false }
+  };
+
+  var VALID_ROLE = ['admin', 'member', 'guest'];
+  var currentEditIndex = -1; // -1 = 新增模式
+  var currentEditId = null; // 当前编辑的成员id（删除/保存按id定位，避免下标错位）
+  var nextMemberId = 100;
+
+  function initNextMemberId(arr) {
+    // 跨会话防 id 碰撞：取现有数字 id 最大值 + 1
+    var max = 99;
+    (arr || []).forEach(function (m) {
+      var mm = /^m(\d+)$/.exec(m && m.id ? String(m.id) : '');
+      if (mm) { var v = parseInt(mm[1], 10); if (v > max) max = v; }
+    });
+    nextMemberId = max + 1;
+  }
+
+  function loadMembers() {
+    try {
+      var raw = localStorage.getItem(MEMBERS_KEY);
+      if (raw) {
+        var arr = JSON.parse(raw);
+        if (Array.isArray(arr) && arr.length) {
+          // 逐项校验：非法 role 丢弃；缺 id 补 id
+          var cleaned = arr.filter(function (m) {
+            return m && VALID_ROLE.indexOf(m.role) >= 0;
+          }).map(function (m) {
+            if (!m.id) { m.id = 'm' + (nextMemberId++); }
+            return { id: m.id, name: m.name || '', rel: m.rel || '', role: m.role };
+          });
+          initNextMemberId(cleaned);
+          return cleaned;
+        }
+      }
+    } catch (e) {}
+    return JSON.parse(JSON.stringify(DEFAULT_MEMBERS));
+  }
+  function saveMembers(arr) {
+    try { localStorage.setItem(MEMBERS_KEY, JSON.stringify(arr)); } catch (e) {}
+  }
+  function resolveAddby(meta) {
+    if (!meta) return meta;
+    var members = loadMembers();
+    return String(meta).replace(/@(m\d+)/g, function (mm, id) {
+      for (var i = 0; i < members.length; i++) { if (members[i].id === id) return members[i].name || ''; }
+      return '';
+    });
+  }
+  function initialOf(name) {
+    return (name || '?').trim().charAt(0) || '?';
+  }
+  function isSelf(m) {
+    return m && m.id === SELF_ID;
+  }
+
+  function renderMembers() {
+    var members = loadMembers();
+    var list = document.getElementById('member-list');
+    if (!list) return;
+    list.innerHTML = members.map(function (m, i) {
+      var grad = ROLE_GRADIENT[m.role] || ROLE_GRADIENT.guest;
+      var last = (i === members.length - 1) ? '' : 'border-bottom: 1px solid var(--border);';
+      var selfTag = isSelf(m) ? ' <span class="meta" style="font-size: 11px; color: var(--accent-deep);">（我）</span>' : '';
+      return '<div class="list-row" style="display: flex; align-items: center; gap: 12px; padding: 11px 0; ' + last + ' cursor: pointer;" data-action="edit-member" data-member-id="' + (m.id || '') + '">' +
+        '<div style="width: 40px; height: 40px; border-radius: 50%; background: ' + grad + '; color: #fff; display: grid; place-items: center; font-family: var(--font-display); font-size: 16px; flex-shrink: 0;">' + initialOf(m.name) + '</div>' +
+        '<div style="flex: 1;"><div style="font-weight: 500; font-size: 14px;">' + (m.name || '') + selfTag + ' <span class="meta" style="font-size: 11px;">' + (m.rel || '') + '</span></div></div>' +
+        '<span class="role-badge ' + (ROLE_CLASS[m.role] || 'guest') + '">' + (ROLE_TEXT[m.role] || ROLE_TEXT.guest) + '</span>' +
+        '</div>';
+    }).join('');
+    document.getElementById('member-count-note').textContent = '创建于 2024 年 · ' + members.length + ' 位成员';
+    homeMemberCount(members.length);
+    updatePermPanel(members);
+    renderSelfCard();
+  }
+
+  function homeMemberCount(n) {
+    // 首页“熊家 · 4 位成员”与“我的”卡片同步（限定在我的页与首页成员卡，避免误改其它 greeting）
+    document.querySelectorAll('[data-member-count]').forEach(function (el) { el.textContent = n + ' 位成员'; });
+    document.querySelectorAll('[data-family-members-count]').forEach(function (el) { el.textContent = n + ' 人 ›'; });
+    var profileGreet = document.querySelector('#page-profile .greeting');
+    if (profileGreet) {
+      profileGreet.textContent = familyName() + ' · ' + n + ' 位成员';
+    }
+  }
+
+  function renderFamily() {
+    var fam = familyName();
+    var famEl = document.getElementById('family-name');
+    if (famEl) famEl.textContent = fam;
+    var members = loadMembers();
+    homeMemberCount(members.length);
+  }
+
+  function openFamilyEdit() {
+    var fam = familyName();
+    document.getElementById('family-name-input').textContent = fam;
+    inFlow = false;
+    showPage('page-family-name');
+  }
+
+  function saveFamilyName() {
+    var name = (document.getElementById('family-name-input').textContent || '').trim();
+    if (!name) { toast('请输入家庭名称'); return; }
+    setFamilyName(name);
+    renderFamily();
+    toast('家庭名称已更新');
+    showPage('page-members');
+  }
+
+  function renderSelfCard() {
+    var members = loadMembers();
+    var self = null;
+    for (var i = 0; i < members.length; i++) { if (isSelf(members[i])) { self = members[i]; break; } }
+    if (!self) self = members[0];
+    if (!self) return;
+    var init = document.getElementById('self-card-initial');
+    var name = document.getElementById('self-card-name');
+    var sub = document.getElementById('self-card-sub');
+    if (init) init.textContent = initialOf(self.name);
+    if (name) name.innerHTML = (self.name || '') + ' <span class="role-badge ' + (ROLE_CLASS[self.role] || 'guest') + '" style="margin-left: 6px;">' + (ROLE_TEXT[self.role] || ROLE_TEXT.guest) + '</span>';
+    if (sub) sub.textContent = '家 · ' + (self.rel || '') + ' · ' + owningPermText(self.role);
+  }
+
+  function owningPermText(role) {
+    var t = { admin: '拥有全部权限', member: '拥有大部分权限', guest: '仅查看权限' };
+    return t[role] || t.guest;
+  }
+
+  function updatePermPanel(members) {
+    // 权限面板默认显示当前编辑的成员（或第一位成员）
+    var idx = currentEditIndex >= 0 ? currentEditIndex : 0;
+    if (idx >= members.length) idx = 0;
+    var m = members[idx];
+    if (!m) return;
+    var pn = document.getElementById('perm-member-name');
+    if (pn) pn.textContent = '成员权限（' + (m.name || '') + '）';
+    var pr = document.getElementById('perm-member-role');
+    if (pr) { pr.className = 'role-badge ' + (ROLE_CLASS[m.role] || 'guest'); pr.textContent = ROLE_TEXT[m.role] || ROLE_TEXT.guest; }
+    var perms = ROLE_PERMS[m.role] || ROLE_PERMS.guest;
+    setSwitch('perm-add', perms.add);
+    setSwitch('perm-edit', perms.edit);
+    setSwitch('perm-del', perms.del);
+    setSwitch('perm-loc', perms.loc);
+  }
+  function setSwitch(id, on) {
+    var el = document.getElementById(id);
+    if (el) el.checked = !!on;
+  }
+
+  /* ── 成员编辑打开 ── */
+  function openMemberEdit(id) {
+    var members = loadMembers();
+    currentEditIndex = -1;
+    for (var i = 0; i < members.length; i++) {
+      if (String(members[i].id) === String(id)) { currentEditIndex = i; break; }
+    }
+    currentEditId = currentEditIndex >= 0 ? String(members[currentEditIndex].id) : null;
+    var isEdit = currentEditIndex >= 0;
+    var m = isEdit ? members[currentEditIndex] : { name: '', rel: '', role: 'member' };
+    document.getElementById('member-edit-title').textContent = isEdit ? '编辑成员' : '添加成员';
+    document.getElementById('member-name').textContent = m.name || '';
+    document.getElementById('member-rel').textContent = m.rel || '';
+    selectRole(m.role);
+    var av = document.getElementById('member-edit-avatar');
+    av.textContent = initialOf(m.name);
+    document.getElementById('member-edit-name-preview').textContent = m.name || '未命名';
+    document.getElementById('member-edit-role-bound').textContent = ROLE_TEXT[m.role] || ROLE_TEXT.member;
+    document.getElementById('delete-member-btn').style.display = isEdit ? 'block' : 'none';
+    inFlow = false;
+    showPage('page-member-edit');
+  }
+
+  function selectRole(role) {
+    document.querySelectorAll('#member-role-options .tag').forEach(function (tag) {
+      var on = tag.getAttribute('data-role') === role;
+      tag.classList.toggle('active', on);
+    });
+    var hint = document.getElementById('role-hint');
+    if (hint) hint.textContent = ROLE_HINT[role] || '';
+  }
+
+  function saveMember() {
+    var members = loadMembers();
+    var name = (document.getElementById('member-name').textContent || '').trim();
+    var rel = (document.getElementById('member-rel').textContent || '').trim();
+    var role = (document.querySelector('#member-role-options .tag.active') || { getAttribute: function(){ return 'member'; } }).getAttribute('data-role') || 'member';
+    if (!name) { toast('请输入姓名'); return; }
+    var editIdx = -1;
+    if (currentEditId) { for (var ei = 0; ei < members.length; ei++) { if (String(members[ei].id) === String(currentEditId)) { editIdx = ei; break; } } }
+    if (editIdx < 0 && currentEditIndex >= 0 && currentEditIndex < members.length) editIdx = currentEditIndex;
+    if (editIdx >= 0) {
+      var old = members[editIdx];
+      if (isSelf(old) && role !== old.role) { toast('不能修改自己的管理员身份'); return; }
+      // 降级唯一管理员 / 删除全部管理员的拦截
+      var admins = members.filter(function (x) { return x.role === 'admin' && x.id !== old.id; });
+      if (old.role === 'admin' && role !== 'admin' && admins.length === 0) { toast('需保留至少 1 位管理员'); return; }
+      members[editIdx] = { id: old.id, name: name, rel: rel, role: role };
+    } else {
+      members.push({ id: 'm' + (nextMemberId++), name: name, rel: rel, role: role });
+    }
+    saveMembers(members);
+    currentEditId = null;
+    renderMembers();
+    toast(editIdx >= 0 ? '成员已更新' : '成员已添加');
+    showPage('page-members');
+  }
+
+  function deleteMember() {
+    // 优先按当前编辑的成员id定位（若 currentEditId 有效），再回退下标
+    var members = loadMembers();
+    var idx = -1;
+    if (currentEditId) {
+      for (var i = 0; i < members.length; i++) { if (String(members[i].id) === String(currentEditId)) { idx = i; break; } }
+    }
+    if (idx < 0 && currentEditIndex >= 0 && currentEditIndex < members.length) idx = currentEditIndex;
+    if (idx < 0) { toast('未找到要删除的成员'); return; }
+    var m = members[idx];
+    if (!m) { toast('未找到要删除的成员'); return; }
+    if (isSelf(m)) { toast('不能删除自己'); return; }
+    if (m.role === 'admin') {
+      var admins = members.filter(function (x) { return x.role === 'admin'; });
+      if (admins.length <= 1) { toast('需保留至少 1 位管理员'); return; }
+    }
+    if (!window.confirm('确定删除成员「' + (m.name || '') + '」吗？' + (m.role === 'admin' ? '该成员是管理员。' : ''))) return;
+    members.splice(idx, 1);
+    saveMembers(members);
+    currentEditIndex = -1;
+    currentEditId = null;
+    renderMembers();
+    toast('成员已删除');
+    showPage('page-members');
+  }
+
+  /* ── page switching ── */
+  function showPage(id) {
+    pages.forEach(function (p) { p.classList.toggle('active', p.id === id); });
+    tabs.forEach(function (t) {
+      var on = t.getAttribute('data-tab') === id;
+      t.classList.toggle('active', on);
+      t.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+    document.querySelector('.content').scrollTop = 0;
+  }
+
+  function goHome() {
+    inFlow = false;
+    showPage('page-home');
+  }
+
+  /* ── 物品详情数据（点击物品行时动态填充） ── */
+  var ITEM_DETAILS = {
+    '布洛芬缓释胶囊': { badge: 'danger', badgeText: '剩 6 天', meta: '药品 · 添加于 2025-03-12 · @m1', loc: '药箱 · 上层', qty: '2 盒', prod: '2025-03-12', exp: '2026-08-29', batch: '250312A', tags: '<span class="tag" style="margin-right: 6px;">常用</span><span class="tag">需冷藏?</span>', note: '饭后服用，开封后 6 个月内用完。备用药，注意别让小朋友拿到。' },
+    '空气炸锅': { badge: 'warn', badgeText: '保修 9 月', meta: '家电 · 添加于 2026-01-18 · @m2', loc: '厨房 · 吊柜下层', qty: '1 件', prod: '—', exp: '—', batch: '—', tags: '<span class="tag" style="margin-right: 6px;">厨房</span><span class="tag">大件</span>', note: '保修至 2027 年 5 月，发票在证件盒。使用前记得取出说明书。' },
+    '蓝光眼镜': { badge: 'ok', badgeText: '正常', meta: '数码 3C · 添加于 2026-08-20 · @m3', loc: '书房 · 书桌抽屉', qty: '1 件', prod: '—', exp: '—', batch: '—', tags: '<span class="tag" style="margin-right: 6px;">常用</span>', note: '写作业用的，别借给别人。' },
+    '身份证扫描件': { badge: 'ok', badgeText: '正常', meta: '证件 · 添加于 2026-06-02 · @m1', loc: '玄关 · 证件盒', qty: '1 件', prod: '—', exp: '—', batch: '—', tags: '<span class="tag" style="margin-right: 6px;">重要</span>', note: '电子扫描件备份，纸质原件在户口本夹层。' },
+    '维生素 C 泡腾片': { badge: 'warn', badgeText: '24 天', meta: '药品 · 添加于 2026-02-14 · @m2', loc: '客厅 · 茶几抽屉', qty: '1 支', prod: '2026-02-14', exp: '2026-09-16', batch: '260214B', tags: '<span class="tag" style="margin-right: 6px;">保健</span>', note: '每天一片，泡水喝。' },
+    '电蚊香液（备用）': { badge: 'ok', badgeText: '正常', meta: '日用 · 添加于 2026-05-30 · @m1', loc: '储物间 · 收纳箱 B', qty: '3 瓶', prod: '—', exp: '—', batch: '—', tags: '<span class="tag" style="margin-right: 6px;">夏季</span>', note: '今年的用完再开新的。' },
+    '户口本': { badge: 'ok', badgeText: '正常', meta: '证件 · 添加于 2026-03-11 · @m1', loc: '玄关 · 证件盒', qty: '1 本', prod: '—', exp: '—', batch: '—', tags: '<span class="tag" style="margin-right: 6px;">重要</span>', note: '全家证件，用后放回原处。' },
+    '工具箱': { badge: 'ok', badgeText: '正常', meta: '工具 · 添加于 2026-04-05 · @m1', loc: '储物间 · 工具架', qty: '1 套', prod: '—', exp: '—', batch: '—', tags: '<span class="tag" style="margin-right: 6px;">工具</span>', note: '含扳手、螺丝刀、卷尺。' }
+  };
+
+  function fillDetail(name) {
+    var d = ITEM_DETAILS[name] || ITEM_DETAILS['布洛芬缓释胶囊'];
+    document.getElementById('dt-name').textContent = name;
+    var badge = document.getElementById('dt-badge');
+    badge.className = 'badge ' + d.badge;
+    badge.textContent = d.badgeText;
+    document.getElementById('dt-meta').textContent = resolveAddby(d.meta);
+    document.getElementById('dt-loc').textContent = d.loc;
+    document.getElementById('dt-qty').textContent = d.qty;
+    document.getElementById('dt-prod').textContent = d.prod;
+    document.getElementById('dt-exp').textContent = d.exp;
+    document.getElementById('dt-batch').textContent = d.batch;
+    document.getElementById('dt-tags').innerHTML = d.tags;
+    document.getElementById('dt-note').textContent = d.note;
+  }
+
+  /* ── toast ── */
+  function toast(msg) {
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { toastEl.classList.remove('show'); }, 1800);
+  }
+
+  /* ── global click routing ── */
+  document.addEventListener('click', function (e) {
+    var el = e.target.closest('[data-action], [data-toast], [data-tab], [data-role="toggle"], [data-role="loc"]');
+    if (!el) return;
+
+    if (el.hasAttribute('data-role') && el.getAttribute('data-role') === 'toggle') {
+      el.closest('.loc-node').classList.toggle('open');
+      return;
+    }
+
+    if (el.hasAttribute('data-tab')) {
+      inFlow = false;
+      showPage(el.getAttribute('data-tab'));
+      return;
+    }
+
+    if (el.hasAttribute('data-toast')) {
+      toast(el.getAttribute('data-toast'));
+    }
+
+    var action = el.getAttribute('data-action');
+    if (!action) return;
+
+    switch (action) {
+      case 'go-home':        goHome(); break;
+      case 'go-items':       showPage('page-items'); break;
+      case 'go-locations':   showPage('page-locations'); break;
+      case 'go-reminders':   showPage('page-reminders'); break;
+      case 'go-profile':     showPage('page-profile'); break;
+      case 'go-detail':
+        fillDetail(el.getAttribute('data-item') || '布洛芬缓释胶囊');
+        showPage('page-detail');
+        break;
+      case 'go-members':     showPage('page-members'); break;
+      case 'edit-member':    openMemberEdit(el.getAttribute('data-member-id')); break;
+      case 'add-member':     openMemberEdit(-1); break;
+      case 'save-member':    saveMember(); break;
+      case 'delete-member':  deleteMember(); break;
+      case 'edit-family-name': openFamilyEdit(); break;
+      case 'save-family-name': saveFamilyName(); break;
+      case 'go-add-location': showPage('page-add-location'); break;
+      case 'go-scan':        inFlow = true; showPage('page-scan'); break;
+      case 'go-scan-error':  inFlow = true; showPage('page-scan-error'); break;
+      case 'go-scanning':    inFlow = true; showPage('page-scanning'); break;
+      case 'go-medicine':    inFlow = true; showPage('page-medicine'); break;
+      case 'go-medicine-error': inFlow = true; showPage('page-medicine-error'); break;
+      case 'go-medicine-scanning': inFlow = true; showPage('page-medicine-scanning'); break;
+      default: break;
+    }
+  });
+
+  /* ── 拍照添加流程 ── */
+  document.getElementById('shutter-scan').addEventListener('click', function () {
+    inFlow = true;
+    showPage('page-scanning');
+    setTimeout(function () { showPage('page-scan-confirm'); }, 1600);
+  });
+
+  document.getElementById('save-item').addEventListener('click', function () {
+    toast('已加入物品库');
+    setTimeout(goHome, 700);
+  });
+
+  /* ── 药品扫描流程 ── */
+  document.getElementById('shutter-med').addEventListener('click', function () {
+    inFlow = true;
+    showPage('page-medicine-scanning');
+    setTimeout(function () { showPage('page-medicine-confirm'); }, 1800);
+  });
+
+  document.getElementById('save-medicine').addEventListener('click', function () {
+    toast('已加入药品库并挂提醒');
+    setTimeout(goHome, 700);
+  });
+
+  /* ── tag selection (single-select) ── */
+  document.querySelectorAll('.field .row .tag').forEach(function (tag) {
+    tag.addEventListener('click', function () {
+      var parent = tag.closest('.row');
+      parent.querySelectorAll('.tag').forEach(function (t) { t.classList.remove('active'); });
+      tag.classList.add('active');
+    });
+  });
+  document.querySelectorAll('.pad .row .tag').forEach(function (tag) {
+    if (!tag.closest('.field')) {
+      tag.addEventListener('click', function () {
+        var parent = tag.closest('.row');
+        if (!parent) return;
+        parent.querySelectorAll('.tag').forEach(function (t) { t.classList.remove('active'); });
+        tag.classList.add('active');
+      });
+    }
+  });
+
+  /* ── toggle switches: change 事件用委托，动态渲染的开关也生效 ── */
+  document.addEventListener('change', function (e) {
+    var t = e.target;
+    if (t && t.type === 'checkbox' && !(t.closest && t.closest('.switch'))) {
+      toast(t.checked ? '已开启' : '已关闭');
+    }
+  });
+
+  /* ── 初始化：渲染成员列表 + 家庭名 ── */
+  renderMembers();
+  renderFamily();
+  renderSelfCard();
+})();
+</script>
+<script>
+  /* PWA 强化：Service Worker 注册 + 快捷入口路由 */
+  (function () {
+    // 1) 注册 Service Worker（仅在支持的环境中）
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('./sw.js').then(function (reg) {
+        // 有新 SW 时监听更新
+        reg.addEventListener('updatefound', function () {
+          var newWorker = reg.installing;
+          if (newWorker) {
+            newWorker.addEventListener('statechange', function () {
+              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                newWorker.postMessage('SKIP_WAITING');
+              }
+            });
+          }
+        });
+      }).catch(function (err) {
+        console.warn('SW 注册失败（本地预览可忽略）:', err);
+      });
+    }
+
+    // 2) 快捷入口路由：读取 ?q= 参数跳转到对应流程页
+    var q = new URLSearchParams(location.search).get('q');
+    if (q) {
+      var target = null;
+      if (q === 'add') target = 'page-scan';
+      else if (q === 'medicine') target = 'page-medicine';
+      if (target) {
+        // 等待页面初始化完成后跳转（toast 函数与 showPage 在上一段已定义）
+        setTimeout(function () {
+          try { showPage(target); } catch (e) {}
+        }, 300);
+      }
+    }
+  })();
+</script>
+</body>
+</html>
