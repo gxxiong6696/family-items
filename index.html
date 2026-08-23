@@ -295,10 +295,14 @@
     background: #23231F;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
   }
+  .camera-view video#cam-preview {
+    position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+  }
   .camera-view .frame-line {
     position: absolute; inset: 18px; border: 1.5px dashed rgba(255,255,255,0.55); border-radius: 16px;
+    z-index: 2; pointer-events: none;
   }
-  .camera-view .scan-tip { color: rgba(255,255,255,0.85); font-size: 13px; text-align: center; padding: 0 24px; z-index: 1; }
+  .camera-view .scan-tip { color: rgba(255,255,255,0.85); font-size: 13px; text-align: center; padding: 0 24px; z-index: 2; }
   .camera-view .scan-tip .mono { font-family: var(--font-mono); font-size: 11px; color: rgba(255,255,255,0.6); display: block; margin-top: 6px; }
   .shutter-btn {
     width: 64px; height: 64px; border-radius: 50%; background: #fff; border: 0;
@@ -843,6 +847,8 @@
 
           <section class="pad" style="padding-top: 4px;">
             <div class="camera-view" data-od-id="camera-preview">
+              <video id="cam-preview" playsinline muted autoplay style="position:absolute; inset:0; width:100%; height:100%; object-fit:cover; transition:opacity .2s;"></video>
+              <div id="camera-hint" style="position:absolute; inset:0; display:none; align-items:center; justify-content:center; text-align:center; color:rgba(255,255,255,.9); font-size:14px; padding:0 24px; z-index:1; box-sizing:border-box;"></div>
               <div class="frame-line"></div>
               <div class="scan-tip">
                 将物品完整放入取景框
@@ -1709,7 +1715,7 @@
       case 'edit-family-name': openFamilyEdit(); break;
       case 'save-family-name': saveFamilyName(); break;
       case 'go-add-location': showPage('page-add-location'); break;
-      case 'go-scan':        inFlow = true; showPage('page-scan'); break;
+      case 'go-scan':        inFlow = true; showPage('page-scan'); startCamera(); break;
       case 'go-scan-error':  inFlow = true; showPage('page-scan-error'); break;
       case 'go-scanning':    inFlow = true; showPage('page-scanning'); break;
       case 'go-medicine':    inFlow = true; showPage('page-medicine'); break;
@@ -1719,11 +1725,82 @@
     }
   });
 
+  /* ── 摄像头控制（真实取景预览） ── */
+  var camStream = null, camVideo = null, camHint = null;
+  function ensureCamEls() {
+    if (!camVideo) camVideo = document.getElementById('cam-preview');
+    if (!camHint)  camHint  = document.getElementById('camera-hint');
+  }
+  function showCamError(msg) {
+    ensureCamEls();
+    if (camHint) { camHint.textContent = msg; camHint.style.display = 'flex'; }
+    if (camVideo) camVideo.style.opacity = '0';
+    if (camStream) { camStream.getTracks().forEach(function (t) { t.stop(); }); camStream = null; }
+  }
+  function startCamera() {
+    ensureCamEls();
+    if (!camVideo) return;
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      showCamError('当前浏览器/环境不支持摄像头，请从安装的 App 或 HTTPS 网址打开');
+      return;
+    }
+    if (camHint) camHint.style.display = 'none';
+    if (camVideo) camVideo.style.opacity = '1';
+    navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
+      audio: false
+    }).then(function (stream) {
+      camStream = stream;
+      camVideo.srcObject = stream;
+      camVideo.setAttribute('playsinline', '');
+      camVideo.setAttribute('webkit-playsinline', '');
+      camVideo.setAttribute('autoplay', '');
+      camVideo.setAttribute('muted', '');
+      camVideo.play().catch(function () {});
+    }).catch(function (err) {
+      var msg = '无法开启摄像头';
+      if (err && (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError' || err.name === 'SecurityError')) {
+        msg = '请在浏览器/系统设置中允许访问摄像头';
+      } else if (err && (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError')) {
+        msg = '未检测到摄像头，请在手机上打开';
+      } else if (err && (err.name === 'NotReadableError' || err.name === 'TrackStartError')) {
+        msg = '摄像头被占用，请关闭其它相机应用后重试';
+      } else if (err && err.name === 'NotSupportedError') {
+        msg = '当前环境不支持摄像头';
+      }
+      showCamError(msg);
+    });
+  }
+  function stopCamera() {
+    if (camStream) { camStream.getTracks().forEach(function (t) { t.stop(); }); camStream = null; }
+    ensureCamEls();
+    if (camVideo) camVideo.srcObject = null;
+  }
+  function grabFrame() {
+    ensureCamEls();
+    if (!camVideo || !camVideo.videoWidth) return null;
+    var canvas = document.createElement('canvas');
+    canvas.width  = camVideo.videoWidth;
+    canvas.height = camVideo.videoHeight;
+    canvas.getContext('2d').drawImage(camVideo, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL('image/jpeg', 0.92);
+  }
+  // 离开页面/切后台时释放摄像头，避免占用与白屏
+  window.addEventListener('pagehide', stopCamera);
+  document.addEventListener('visibilitychange', function () { if (document.hidden) stopCamera(); });
+
   /* ── 拍照添加流程 ── */
   document.getElementById('shutter-scan').addEventListener('click', function () {
+    var frame = grabFrame();
+    window.__lastShotDataURL = frame;
+    stopCamera();
     inFlow = true;
     showPage('page-scanning');
-    setTimeout(function () { showPage('page-scan-confirm'); }, 1600);
+    setTimeout(function () {
+      var img = document.querySelector('#page-scan-confirm .captured');
+      if (img && frame) img.src = frame;
+      showPage('page-scan-confirm');
+    }, 1600);
   });
 
   document.getElementById('save-item').addEventListener('click', function () {
