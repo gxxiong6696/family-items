@@ -332,6 +332,11 @@
   }
   .field .input .ai-tag svg { width: 10px; height: 10px; stroke: currentColor; fill: none; stroke-width: 2; }
   .field .input.editable { cursor: text; }
+  .field select.input {
+    display: block; width: 100%; appearance: none; -webkit-appearance: none; -moz-appearance: none;
+    background: var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238A857B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 12px center;
+    background-size: 14px; padding-right: 34px; cursor: pointer; font-family: inherit;
+  }
   .field .hint { font-size: 11px; color: var(--muted); margin-top: 5px; line-height: 1.5; }
   .field .hint .conf { color: var(--success); font-weight: 600; }
 
@@ -827,10 +832,17 @@
               </span>
               <span class="meta">›</span>
             </div>
-            <div class="card flat row-between">
+            <div class="card flat row-between" style="cursor: pointer;" data-action="export-backup" data-toast="备份已导出">
               <span style="display: flex; align-items: center; gap: 10px;">
                 <svg viewBox="0 0 24 24" style="width: 19px; height: 19px; stroke: var(--muted); fill: none; stroke-width: 1.7;"><path d="M4 4h16v16H4z"/><path d="M4 10h16M10 4v16"/></svg>
-                数据导出
+                导出备份
+              </span>
+              <span class="meta">›</span>
+            </div>
+            <div class="card flat row-between" style="cursor: pointer;" data-action="import-backup">
+              <span style="display: flex; align-items: center; gap: 10px;">
+                <svg viewBox="0 0 24 24" style="width: 19px; height: 19px; stroke: var(--muted); fill: none; stroke-width: 1.7;"><path d="M4 4h16v16H4z"/><path d="M4 10h16M10 4v16"/></svg>
+                导入备份
               </span>
               <span class="meta">›</span>
             </div>
@@ -919,18 +931,18 @@
 
           <section class="pad" style="padding-top: 4px;">
             <div class="row" style="gap: 14px; align-items: flex-start; margin-bottom: 18px;">
-              <div class="ph-img square" style="width: 76px; height: 76px; border-radius: 14px; flex-shrink: 0;"></div>
+              <div class="ph-img square" id="scan-confirm-ph" style="width: 76px; height: 76px; border-radius: 14px; flex-shrink: 0; display:flex; align-items:center; justify-content:center; color:var(--muted); font-size:12px;">待识别</div>
               <div style="flex: 1;">
-                <div style="font-size: 13px; color: var(--muted); margin-bottom: 4px;">识别结果 · 置信度 96%</div>
-                <div style="font-weight: 600; font-size: 16px;">蓝牙耳机（白色）</div>
-                <div style="font-size: 12px; color: var(--muted); margin-top: 4px;">可编辑下方字段后保存</div>
+                <div style="font-size: 13px; color: var(--muted); margin-bottom: 4px;" id="scan-confirm-status">识别结果待确认</div>
+                <div style="font-weight: 600; font-size: 16px;" id="scan-confirm-name">——</div>
+                <div style="font-size: 12px; color: var(--muted); margin-top: 4px;" id="scan-confirm-tip">请在下方确认或补充物品信息</div>
               </div>
             </div>
 
             <div class="field">
               <label for="f-name">物品名称</label>
-              <div class="input editable" id="f-name" contenteditable="true" role="textbox" aria-multiline="false">蓝牙耳机（白色）</div>
-              <div class="hint"><span class="conf">✓ 已识别</span> · 点击可修改</div>
+              <div class="input editable" id="f-name" contenteditable="true" role="textbox" aria-multiline="false">待填写</div>
+              <div class="hint" id="f-name-hint"><span class="conf">·</span> 等待识别结果，也可手动填写</div>
             </div>
 
             <div class="field">
@@ -945,8 +957,8 @@
 
             <div class="field">
               <label for="f-loc">存放位置</label>
-              <div class="input editable" id="f-loc" contenteditable="true" role="textbox" aria-multiline="false">卧室 · 床头柜抽屉</div>
-              <div class="hint"><span class="conf">✓ 智能建议</span> · 也可从位置列表选择</div>
+              <select class="input editable" id="f-loc"></select>
+              <div class="hint">从下拉列表选择存放位置</div>
             </div>
 
             <div class="grid-2">
@@ -1048,45 +1060,42 @@
 
           <section class="pad" style="padding-top: 4px;">
             <div class="row" style="gap: 14px; align-items: flex-start; margin-bottom: 18px;">
-              <div class="ph-img square" style="width: 76px; height: 76px; border-radius: 14px; flex-shrink: 0;"></div>
+              <div class="ph-img square" id="med-confirm-ph" style="width: 76px; height: 76px; border-radius: 14px; flex-shrink: 0; display:flex; align-items:center; justify-content:center; color:var(--muted); font-size:12px;">待识别</div>
               <div style="flex: 1;">
-                <div style="font-size: 13px; color: var(--muted); margin-bottom: 4px;">药品识别 · 置信度 92%</div>
-                <div style="font-weight: 600; font-size: 16px;">布洛芬缓释胶囊</div>
-                <div style="font-size: 12px; color: var(--muted); margin-top: 4px;">效期字段已自动填写，请核对</div>
+                <div style="font-size: 13px; color: var(--muted); margin-bottom: 4px;" id="med-confirm-status">识别结果待确认</div>
+                <div style="font-weight: 600; font-size: 16px;" id="med-confirm-name">——</div>
+                <div style="font-size: 12px; color: var(--muted); margin-top: 4px;" id="med-confirm-tip">请在下方确认或补充药品效期信息</div>
               </div>
             </div>
 
             <div class="field">
               <label for="m-name">药品名称</label>
-              <div class="input editable" id="m-name" contenteditable="true" role="textbox" aria-multiline="false">布洛芬缓释胶囊</div>
-              <div class="hint"><span class="conf">✓ 已识别</span></div>
+              <div class="input editable" id="m-name" contenteditable="true" role="textbox" aria-multiline="false">待填写</div>
+              <div class="hint" id="m-name-hint"><span class="conf">·</span> 等待识别结果，也可手动填写</div>
             </div>
 
             <div class="field">
               <label for="m-prod">生产日期</label>
-              <div class="input editable" id="m-prod" contenteditable="true" role="textbox" aria-multiline="false">2025-03-12</div>
-              <div class="hint"><span class="conf">✓ 已识别</span> · 来自包装印刷日期</div>
+              <div class="input editable" id="m-prod" contenteditable="true" role="textbox" aria-multiline="false">—</div>
+              <div class="hint" id="m-prod-hint"><span class="conf">·</span> 待识别，也可手动填写</div>
             </div>
 
             <div class="field">
               <label for="m-exp">有效期至</label>
-              <div class="input editable" id="m-exp" contenteditable="true" role="textbox" aria-multiline="false">2026-08-29</div>
-              <div class="hint"><span class="conf">✓ 已识别</span> · 将自动加入临期提醒（提前 30 天）</div>
+              <div class="input editable" id="m-exp" contenteditable="true" role="textbox" aria-multiline="false">—</div>
+              <div class="hint" id="m-exp-hint"><span class="conf">·</span> 待识别，将自动加入临期提醒（提前 30 天）</div>
             </div>
 
             <div class="field">
               <label for="m-batch">批号</label>
-              <div class="input editable" id="m-batch" contenteditable="true" role="textbox" aria-multiline="false">250312A</div>
-              <div class="hint"><span class="conf">✓ 已识别</span></div>
+              <div class="input editable" id="m-batch" contenteditable="true" role="textbox" aria-multiline="false">—</div>
+              <div class="hint" id="m-batch-hint"><span class="conf">·</span> 待识别，也可手动填写</div>
             </div>
 
             <div class="field">
-              <label>存放位置</label>
-              <div class="row" style="gap: 8px; flex-wrap: wrap;">
-                <span class="tag active">药箱 · 上层</span>
-                <span class="tag">药箱 · 下层</span>
-                <span class="tag">其他位置</span>
-              </div>
+              <label for="m-loc">存放位置</label>
+              <select class="input editable" id="m-loc"></select>
+              <div class="hint">从下拉列表选择存放位置</div>
             </div>
           </section>
 
@@ -1114,7 +1123,7 @@
             <p class="meta" style="margin-top: 4px;" id="dt-meta">药品 · 添加于 2025-03-12 · @m1</p>
           </section>
 
-          <section class="pad stack" style="gap: 10px; margin-top: 14px;">
+          <section class="pad stack" style="gap: 10px; margin-top: 14px;" id="detail-views">
             <div class="card flat row-between">
               <span style="color: var(--muted);">存放位置</span>
               <span style="font-weight: 500;" id="dt-loc">药箱 · 上层</span>
@@ -1145,8 +1154,51 @@
             </div>
           </section>
 
+          <section class="pad stack" style="gap: 10px; margin-top: 14px; display: none;" id="detail-edit-form">
+            <div class="field">
+              <label>物品名称</label>
+              <div class="input editable" id="ed-name" contenteditable="true" role="textbox"></div>
+            </div>
+            <div class="field">
+              <label for="ed-loc">存放位置</label>
+              <select class="input editable" id="ed-loc"></select>
+            </div>
+            <div class="grid-2">
+              <div class="field">
+                <label>数量</label>
+                <div class="input editable" id="ed-qty" contenteditable="true" role="textbox"></div>
+              </div>
+              <div class="field">
+                <label>标签</label>
+                <div class="input editable" id="ed-tags" contenteditable="true" role="textbox"></div>
+              </div>
+            </div>
+            <div class="grid-2">
+              <div class="field">
+                <label>生产日期</label>
+                <div class="input editable" id="ed-prod" contenteditable="true" role="textbox"></div>
+              </div>
+              <div class="field">
+                <label>有效期至</label>
+                <div class="input editable" id="ed-exp" contenteditable="true" role="textbox"></div>
+              </div>
+            </div>
+            <div class="field">
+              <label>批号</label>
+              <div class="input editable" id="ed-batch" contenteditable="true" role="textbox"></div>
+            </div>
+            <div class="field">
+              <label>备注</label>
+              <div class="input editable" id="ed-note" contenteditable="true" role="textbox"></div>
+            </div>
+            <div class="row" style="gap: 10px; margin-top: 6px;">
+              <button class="btn-primary" id="save-item-edit" style="flex: 1;">保存修改</button>
+              <button class="btn-secondary" id="cancel-item-edit" style="flex: 0 0 auto;">取消</button>
+            </div>
+          </section>
+
           <section class="pad stack" style="gap: 10px; margin-top: 16px;">
-            <button class="btn-primary" data-action="go-home" data-toast="已更新">编辑物品</button>
+            <button class="btn-primary" data-action="edit-item">编辑物品</button>
             <button class="btn-secondary" style="color: var(--danger);" data-toast="已删除">删除物品</button>
             <p class="meta" style="text-align: center;">管理员与成员可编辑 · 访客只读</p>
           </section>
@@ -1669,6 +1721,96 @@
     });
   }
 
+  /* ── 数据备份：导出 / 导入（纯本地，下载 JSON / 读取 JSON） ── */
+  var BACKUP_META = {
+    app: 'family-items',
+    version: 1,
+    exportedAt: ''
+  };
+  function exportBackup() {
+    var members = loadMembers();
+    var items = loadUserItems();
+    var family = null;
+    try { family = localStorage.getItem('FAMILY_KEY'); } catch (e) {}
+    var payload = {
+      __meta: { app: 'family-items', version: 1, exportedAt: new Date().toISOString() },
+      familyName: family || '',
+      members: members,
+      items: items
+    };
+    var json = JSON.stringify(payload, null, 2);
+    var blob = new Blob([json], { type: 'application/json;charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    var d = new Date();
+    var name = 'family-items-backup-' + d.getFullYear() + ('0' + (d.getMonth() + 1)).slice(-2) + ('0' + d.getDate()).slice(-2) + '.json';
+    a.href = url;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+    toast('备份已导出：' + name);
+  }
+  function importBackup() {
+    var input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json,application/json';
+    input.style.display = 'none';
+    var cleaned = false;
+    function cleanup() {
+      if (cleaned) return;
+      cleaned = true;
+      if (input.parentNode) input.parentNode.removeChild(input);
+    }
+    input.addEventListener('change', function () {
+      var file = input.files && input.files[0];
+      if (!file) { cleanup(); return; }
+      var reader = new FileReader();
+      reader.onload = function () {
+        try {
+          var obj = JSON.parse(reader.result);
+          if (!obj || typeof obj !== 'object') { toast('导入失败：无效 JSON'); cleanup(); return; }
+          if (obj.__meta && obj.__meta.app === 'family-items') {
+            // 新格式（导出备份生成）
+            var family = (obj.familyName != null) ? obj.familyName : '';
+            var members = Array.isArray(obj.members) ? obj.members : null;
+            var items = Array.isArray(obj.items) ? obj.items : null;
+            if (family !== '') { try { localStorage.setItem('FAMILY_KEY', family); } catch (e) {} }
+            if (members) saveMembers(members);
+            if (items) saveUserItems(items);
+            toast('导入成功');
+          } else if (Array.isArray(obj)) {
+            // 兼容：整包是个数组，视为用户物品
+            saveUserItems(obj);
+            toast('导入成功（识别为物品清单）');
+          } else if (obj.items && Array.isArray(obj.items)) {
+            saveUserItems(obj.items);
+            if (Array.isArray(obj.members)) saveMembers(obj.members);
+            toast('导入成功');
+          } else {
+            toast('导入失败：文件结构无法识别');
+          }
+          mergeUserItemsIntoDetails();
+          renderMembers();
+          renderFamily();
+          renderSelfCard();
+        } catch (err) {
+          toast('导入失败：' + (err && err.message ? err.message : '解析错误'));
+        }
+        cleanup();
+      };
+      reader.onerror = function () { toast('导入失败：读取文件出错'); cleanup(); };
+      reader.readAsText(file);
+    });
+    // 取消选择时清理隐藏 input（change 不会触发）
+    input.addEventListener('cancel', cleanup);
+    document.body.appendChild(input);
+    setTimeout(cleanup, 60000);
+    input.click();
+    return false;
+  }
+
   var _mobilenet = null, _mnetReady = false;
   function loadScript(src, cb) {
     var s = document.createElement('script');
@@ -1695,13 +1837,18 @@
     }
     setTimeout(function () { if (!_mnetReady && cb) cb(false); }, 8000);
   }
-  var RECOG_MAP = {
-    'pill': '药品', 'pill bottle': '药品', 'medicine chest': '药品', 'medicine': '药品', 'soup bowl': '食品',
-    'headphone': '数码 3C', 'earphone': '数码 3C', 'cellular telephone': '数码 3C', 'mobile phone': '数码 3C', 'remote control': '数码 3C', 'radio': '数码 3C', 'iPod': '数码 3C', 'laptop': '数码 3C', 'computer keyboard': '数码 3C', 'mouse': '数码 3C', 'television': '数码 3C', 'monitor': '数码 3C', 'digital watch': '数码 3C', 'camera': '数码 3C', 'pendrive': '数码 3C', 'accesory': '数码 3C', 'notebook': '数码 3C', 'library': '数码 3C', 'cellular telephone': '数码 3C',
-    'refrigerator': '家电', 'microwave': '家电', 'oven': '家电', 'wok': '家电', 'frying pan': '家电', 'coffee maker': '家电', 'toaster': '家电', 'dishwasher': '家电', 'washer': '家电', 'space heater': '家电', 'vacuum': '家电', 'iron': '家电', 'electric fan': '家电', 'computer': '家电', 'washing machine': '家电', 'crossword puzzle': '家电',
-    'bookcase': '证件', 'bookshelf': '证件', 'file': '证件', 'folder': '证件', 'briefcase': '证件', 'envelope': '证件', 'menu': '证件', 'library': '证件', 'camera': '证件', 'passport': '证件', 'book jacket': '证件', 'comic book': '证件', 'desk': '证件',
-    'carton': '日用', 'box': '日用', 'bag': '日用', 'basket': '日用', 'pot': '日用', 'vase': '日用', 'plastic bag': '日用', 'tray': '日用', 'bucket': '日用', 'can opener': '日用', 'bottle': '日用', 'water bottle': '日用', 'cup': '日用', 'mug': '日用', 'plate': '日用', 'table lamp': '日用', 'lampshade': '日用', 'wardrobe': '日用', 'cabinet': '日用', 'doormat': '日用', 'hair spray': '日用', 'lotion': '日用', 'toothbrush': '用品', 'perfume': '用品', 'soap dispenser': '用品', 'hair dryer': '用品', 'cleaning products': '日用', 'syringe': '医疗', 'stethoscope': '医疗', 'band-aid': '医疗'
+  var LABEL_NAME_CN = {
+    'headphone': '无线耳机', 'earphone': '无线耳机', 'cellular telephone': '手机', 'mobile phone': '手机', 'remote control': '遥控器', 'radio': '收音机', 'iPod': '音乐播放器', 'laptop': '笔记本电脑', 'computer keyboard': '键盘', 'mouse': '鼠标', 'television': '电视', 'monitor': '显示器', 'digital watch': '电子手表', 'camera': '相机', 'pendrive': 'U盘', 'accesory': '配件', 'notebook': '笔记本', 'library': '笔记本电脑',
+    'pill': '药片', 'pill bottle': '药瓶', 'medicine chest': '药箱', 'medicine': '药品', 'soup bowl': '碗',
+    'refrigerator': '冰箱', 'microwave': '微波炉', 'oven': '烤箱', 'wok': '炒锅', 'frying pan': '平底锅', 'coffee maker': '咖啡机', 'toaster': '烤面包机', 'dishwasher': '洗碗机', 'washer': '洗衣机', 'space heater': '取暖器', 'vacuum': '吸尘器', 'iron': '电熨斗', 'electric fan': '电风扇', 'washing machine': '洗衣机',
+    'bookcase': '书架', 'bookshelf': '书架', 'file': '文件', 'folder': '文件夹', 'briefcase': '公文包', 'envelope': '信封', 'menu': '菜单', 'passport': '护照', 'book jacket': '书皮', 'comic book': '漫画书', 'desk': '书桌',
+    'carton': '纸箱', 'box': '收纳盒', 'bag': '袋子', 'basket': '篮子', 'pot': '罐子', 'vase': '花瓶', 'plastic bag': '塑料袋', 'tray': '托盘', 'bucket': '水桶', 'can opener': '开罐器', 'bottle': '瓶子', 'water bottle': '水杯', 'cup': '杯子', 'mug': '马克杯', 'plate': '盘子', 'table lamp': '台灯', 'lampshade': '灯罩', 'wardrobe': '衣柜', 'cabinet': '柜子', 'doormat': '门垫', 'hair spray': '发胶', 'lotion': '护肤品', 'toothbrush': '牙刷', 'perfume': '香水', 'soap dispenser': '皂液器', 'hair dryer': '吹风机', 'syringe': '注射器', 'stethoscope': '听诊器', 'band-aid': '创可贴', 'cleaning products': '清洁用品'
   };
+  function cnNameFromLabel(label) {
+    if (!label) return '';
+    for (var k in LABEL_NAME_CN) { if (label.indexOf(k) >= 0) return LABEL_NAME_CN[k]; }
+    return '';
+  }
   function recognizeItem(dataUrl, cb) {
     // 优先客户端模型；失败回退到 null，调用方降级手动
     if (!_mobilenet) { if (cb) cb(null); return; }
@@ -1711,15 +1858,32 @@
         var topLabel = (preds && preds[0] && preds[0].className) ? preds[0].className.toLowerCase() : '';
         var cat = '';
         for (var k in RECOG_MAP) { if (topLabel.indexOf(k) >= 0) { cat = RECOG_MAP[k]; break; } }
-        var name = '';
-        if (preds && preds[0] && preds[1]) {
-          name = (preds[0].className.split(','))[0].trim();
-        }
+        var cn = cnNameFromLabel(topLabel);
+        var name = cn || (preds && preds[0] ? (preds[0].className.split(','))[0].trim() : '');
         if (cb) cb({ category: cat || (preds && preds[0] ? '其他' : ''), label: topLabel, name: name });
       }).catch(function () { if (cb) cb(null); });
     };
     img.onerror = function () { if (cb) cb(null); };
     img.src = dataUrl;
+  }
+
+  /* ── 存放位置统一数据源（下拉菜单选项） ── */
+  var LOC_OPTIONS = [
+    '客厅 · 电视柜 · 抽屉 1', '客厅 · 茶几抽屉', '客厅 · 沙发收纳袋',
+    '厨房 · 吊柜上层', '厨房 · 吊柜下层', '厨房 · 米面收纳桶',
+    '卧室 · 衣柜 · 顶层', '卧室 · 床头柜抽屉',
+    '药箱 · 上层', '药箱 · 下层',
+    '储物间 · 收纳箱 B', '储物间 · 工具架',
+    '玄关 · 证件盒', '其他位置'
+  ];
+  // 生成位置下拉 <option> 列表；selectedLoc 匹配时设为选中
+  function locOptionsHtml(selectedLoc) {
+    var s = '';
+    LOC_OPTIONS.forEach(function (o) {
+      var sel = (o === selectedLoc) ? ' selected' : '';
+      s += '<option value="' + o + '"' + sel + '>' + o + '</option>';
+    });
+    return s;
   }
 
   /* ── 物品详情数据（点击物品行时动态填充） ── */
@@ -1748,6 +1912,49 @@
     document.getElementById('dt-batch').textContent = d.batch;
     document.getElementById('dt-tags').innerHTML = d.tags;
     document.getElementById('dt-note').textContent = d.note;
+  }
+
+  /* ── 物品编辑态 ── */
+  var _viewingItem = '布洛芬缓释胶囊';
+  function enterDetailEdit() {
+    var d = ITEM_DETAILS[_viewingItem] || ITEM_DETAILS['布洛芬缓释胶囊'];
+    var f = document.getElementById('ed-name'); if (f) f.textContent = _viewingItem;
+    var floc = document.getElementById('ed-loc'); if (floc) floc.innerHTML = locOptionsHtml(d.loc);
+    var fq = document.getElementById('ed-qty'); if (fq) fq.textContent = d.qty || '1';
+    var ft = document.getElementById('ed-tags'); if (ft) ft.textContent = d.tags ? d.tags.replace(/<[^>]*>/g, '') : '';
+    var fp = document.getElementById('ed-prod'); if (fp) fp.textContent = d.prod || '—';
+    var fe = document.getElementById('ed-exp'); if (fe) fe.textContent = d.exp || '—';
+    var fb = document.getElementById('ed-batch'); if (fb) fb.textContent = d.batch || '—';
+    var fn = document.getElementById('ed-note'); if (fn) fn.textContent = d.note || '';
+    var views = document.getElementById('detail-views'); if (views) views.style.display = 'none';
+    var form = document.getElementById('detail-edit-form'); if (form) form.style.display = 'block';
+  }
+  function resetDetailEditMode() {
+    var views = document.getElementById('detail-views'); if (views) views.style.display = 'block';
+    var form = document.getElementById('detail-edit-form'); if (form) form.style.display = 'none';
+  }
+  function saveItemEdit() {
+    var newName = (document.getElementById('ed-name') ? document.getElementById('ed-name').textContent.trim() : _viewingItem) || _viewingItem;
+    var loc = (document.getElementById('ed-loc') ? document.getElementById('ed-loc').value : '') || '未设置';
+    var qty = (document.getElementById('ed-qty') ? document.getElementById('ed-qty').textContent.trim() : '') || '1';
+    var tags = (document.getElementById('ed-tags') ? document.getElementById('ed-tags').textContent.trim() : '');
+    var prod = (document.getElementById('ed-prod') ? document.getElementById('ed-prod').textContent.trim() : '') || '—';
+    var exp = (document.getElementById('ed-exp') ? document.getElementById('ed-exp').textContent.trim() : '') || '—';
+    var batch = (document.getElementById('ed-batch') ? document.getElementById('ed-batch').textContent.trim() : '') || '—';
+    var note = (document.getElementById('ed-note') ? document.getElementById('ed-note').textContent.trim() : '');
+    var old = ITEM_DETAILS[_viewingItem] || {};
+    // 从 meta（如“药品 · 添加于 … @m1”）提取分类；无 category 字段时回退提取 meta 首段
+    var oldCategory = old.category;
+    if (!oldCategory && old.meta) { oldCategory = (old.meta.split('·')[0] || '').trim(); }
+    var cur = { name: newName, category: oldCategory || '物品', loc: loc, qty: qty, tags: tags, prod: prod, exp: exp, batch: batch, note: note, badge: old.badge || 'ok', badgeText: old.badgeText || '正常', added: (old.meta || '').replace(/^.*添加于\s*/, ''), member: (old.meta || '').match(/@(\w+)/) ? (old.meta.match(/@(\w+)/)[1]) : '1' };
+    // 持久化到 localStorage（用户物品 + 演示物品都可编辑保存）
+    upsertUserItem(cur);
+    mergeUserItemsIntoDetails();
+    // 若改名，旧的演示条目设为别名；刷新详情视图
+    _viewingItem = newName;
+    fillDetail(newName);
+    resetDetailEditMode();
+    toast('已更新');
   }
 
   /* ── toast ── */
@@ -1783,13 +1990,21 @@
 
     switch (action) {
       case 'go-home':        goHome(); break;
-      case 'go-items':       showPage('page-items'); break;
+      case 'go-items':       resetDetailEditMode(); showPage('page-items'); break;
       case 'go-locations':   showPage('page-locations'); break;
       case 'go-reminders':   showPage('page-reminders'); break;
       case 'go-profile':     showPage('page-profile'); break;
       case 'go-detail':
-        fillDetail(el.getAttribute('data-item') || '布洛芬缓释胶囊');
+        _viewingItem = el.getAttribute('data-item') || '布洛芬缓释胶囊';
+        fillDetail(_viewingItem);
+        resetDetailEditMode();
         showPage('page-detail');
+        break;
+      case 'edit-item':
+        enterDetailEdit();
+        break;
+      case 'save-item-edit':
+        saveItemEdit();
         break;
       case 'go-members':     showPage('page-members'); break;
       case 'edit-member':    openMemberEdit(el.getAttribute('data-member-id')); break;
@@ -1802,9 +2017,13 @@
       case 'go-scan':        inFlow = true; showPage('page-scan'); startCamera(); break;
       case 'go-scan-error':  inFlow = true; showPage('page-scan-error'); break;
       case 'go-scanning':    inFlow = true; showPage('page-scanning'); break;
+      case 'go-scan-confirm': inFlow = true; showPage('page-scan-confirm'); break;
       case 'go-medicine':    inFlow = true; showPage('page-medicine'); startCamera(); break;
       case 'go-medicine-error': inFlow = true; showPage('page-medicine-error'); break;
       case 'go-medicine-scanning': inFlow = true; showPage('page-medicine-scanning'); break;
+      case 'go-medicine-confirm': inFlow = true; showPage('page-medicine-confirm'); break;
+      case 'export-backup': exportBackup(); break;
+      case 'import-backup': importBackup(); break;
       default: break;
     }
   });
@@ -1883,26 +2102,38 @@
     showPage('page-scanning');
     ensureRecognitionModel(function (ok) {
       recognizeItem(frame, function (res) {
-        var img = document.querySelector('#page-scan-confirm .ph-img');
-        if (img && frame) img.src = frame;
-        // 识别回填：名称/分类/位置（仅当页面仍停留在确认页才写）
-        if (res && res.category) {
-          var fname = document.getElementById('f-name');
-          if (fname && (!res.name || res.name.indexOf(',') >= 0)) {
-            fname.textContent = (res.name ? res.name.split(',')[0].trim() : (res.category === '其他' ? '' : res.category));
-          } else if (fname && res.name) {
-            fname.textContent = res.name.split(',')[0].trim();
-          }
+        var img = document.getElementById('scan-confirm-ph');
+        if (img) {
+          img.textContent = ''; img.style.display = 'block'; img.style.background = '';
+          if (frame) { img.src = frame; img.style.backgroundSize = 'cover'; img.style.backgroundImage = 'url(' + frame + ')'; img.style.backgroundPosition = 'center'; }
+        }
+        var nameEl = document.getElementById('f-name');
+        if (res && res.category && res.category !== '其他') {
+          var theName = '';
+          if (res.name) { theName = res.name.split(',')[0].trim(); }
+          else { theName = res.category; }
+          if (nameEl) nameEl.textContent = theName || '待填写';
+          var sName = document.getElementById('scan-confirm-name'); if (sName) sName.textContent = theName || '——';
+          var sStatus = document.getElementById('scan-confirm-status'); if (sStatus) sStatus.textContent = '已识别为「' + res.category + '」';
+          var sTip = document.getElementById('scan-confirm-tip'); if (sTip) sTip.textContent = '请在下方确认或修改信息后保存';
+          var hintEl = document.getElementById('f-name-hint'); if (hintEl) hintEl.innerHTML = '<span class="conf">✓ 已识别</span> · 点击可修改';
           var tags = document.querySelectorAll('#page-scan-confirm .field .row .tag');
           tags.forEach(function (t) { t.classList.remove('active'); });
-          tags.forEach(function (t) {
-            if (t.textContent.trim() === res.category) t.classList.add('active');
-          });
+          tags.forEach(function (t) { if (t.textContent.trim() === res.category) t.classList.add('active'); });
+        } else {
+          if (nameEl) nameEl.textContent = '待填写';
+          var sName2 = document.getElementById('scan-confirm-name'); if (sName2) sName2.textContent = '未识别到物品';
+          var sStatus2 = document.getElementById('scan-confirm-status'); if (sStatus2) sStatus2.textContent = '未识别到物品';
+          var sTip2 = document.getElementById('scan-confirm-tip'); if (sTip2) sTip2.textContent = '请在下方手动填写物品信息，或重新拍摄';
+          var hint2 = document.getElementById('f-name-hint'); if (hint2) hint2.innerHTML = '<span class="conf">·</span> 未识别，请手动填写';
         }
         showPage('page-scan-confirm');
       });
     });
   });
+
+  document.getElementById('save-item-edit').addEventListener('click', function () { saveItemEdit(); });
+  document.getElementById('cancel-item-edit').addEventListener('click', function () { resetDetailEditMode(); });
 
   document.getElementById('save-item').addEventListener('click', function () {
     var nameEl = document.getElementById('f-name');
@@ -1915,17 +2146,18 @@
     tags.forEach(function (t) { if (t.classList.contains('active')) cat = t.textContent.trim(); });
     var today = new Date();
     var dstr = today.toISOString().slice(0, 10);
+    var savedLoc = locEl ? locEl.value : '未设置';
     upsertUserItem({
       name: name,
       category: cat,
-      loc: locEl ? locEl.textContent.trim() : '未设置',
+      loc: savedLoc,
       qty: qtyEl ? qtyEl.textContent.trim() : '1',
       tags: tagEl ? tagEl.textContent.trim() : '',
       badge: 'ok', badgeText: '正常', added: dstr, member: '1',
       note: '', prod: '—', exp: '—', batch: '—'
     });
     mergeUserItemsIntoDetails();
-    prependItemRow(name, cat, locEl ? locEl.textContent.trim() : '未设置', qtyEl ? qtyEl.textContent.trim() : '1');
+    prependItemRow(name, cat, savedLoc, qtyEl ? qtyEl.textContent.trim() : '1');
     toast('已加入物品库');
     setTimeout(goHome, 700);
   });
@@ -1953,17 +2185,27 @@
     showPage('page-medicine-scanning');
     ensureRecognitionModel(function (ok) {
       recognizeItem(frame, function (res) {
-        var img = document.querySelector('#page-medicine-confirm .ph-img');
-        if (img && frame) img.src = frame;
+        var img = document.getElementById('med-confirm-ph');
+        if (img) {
+          img.textContent = '';
+          if (frame) { img.style.backgroundSize = 'cover'; img.style.backgroundImage = 'url(' + frame + ')'; img.style.backgroundPosition = 'center'; }
+        }
+        var mname = document.getElementById('m-name');
         if (res && res.category) {
-          var mname = document.getElementById('m-name');
-          if (mname && res.name) mname.textContent = res.name.split(',')[0].trim();
-          // 药品类：把存放位置切到药箱
-          var locTags = document.querySelectorAll('#page-medicine-confirm .field .row .tag');
-          locTags.forEach(function (t) { t.classList.remove('active'); });
-          locTags.forEach(function (t) {
-            if (t.textContent.indexOf('药箱') >= 0) t.classList.add('active');
-          });
+          var theName = (res.name ? res.name.split(',')[0].trim() : (res.category === '药品' ? '药品' : res.category));
+          if (mname) mname.textContent = theName || '待填写';
+          var sName = document.getElementById('med-confirm-name'); if (sName) sName.textContent = theName || '——';
+          var sStatus = document.getElementById('med-confirm-status'); if (sStatus) sStatus.textContent = '已识别为「' + res.category + '」';
+          var sTip = document.getElementById('med-confirm-tip'); if (sTip) sTip.textContent = '请核对并补充药品效期信息';
+          var hint = document.getElementById('m-name-hint'); if (hint) hint.innerHTML = '<span class="conf">✓ 已识别</span> · 点击可修改';
+          var mloc = document.getElementById('m-loc');
+          if (mloc) { mloc.value = '药箱 · 上层'; }
+        } else {
+          if (mname) mname.textContent = '待填写';
+          var sName2 = document.getElementById('med-confirm-name'); if (sName2) sName2.textContent = '未识别到药品';
+          var sStatus2 = document.getElementById('med-confirm-status'); if (sStatus2) sStatus2.textContent = '未识别到药品';
+          var sTip2 = document.getElementById('med-confirm-tip'); if (sTip2) sTip2.textContent = '请在下方手动填写药品信息与效期，或重新拍摄';
+          var hint2 = document.getElementById('m-name-hint'); if (hint2) hint2.innerHTML = '<span class="conf">·</span> 未识别，请手动填写';
         }
         showPage('page-medicine-confirm');
       });
@@ -1980,8 +2222,8 @@
     var exp = expEl ? expEl.textContent.trim() : '';
     var batch = batchEl ? batchEl.textContent.trim() : '';
     var loc = '药箱 · 上层';
-    var locTags = document.querySelectorAll('#page-medicine-confirm .field .row .tag');
-    locTags.forEach(function (t) { if (t.classList.contains('active')) loc = t.textContent.trim(); });
+    var locEl = document.getElementById('m-loc');
+    if (locEl && locEl.value) loc = locEl.value;
     var today = new Date();
     var dstr = today.toISOString().slice(0, 10);
     var badge = 'ok', badgeText = '正常';
@@ -2033,6 +2275,14 @@
   });
 
   /* ── 初始化：渲染成员列表 + 家庭名 ── */
+  // 填充存放位置下拉（拍照/药品确认页共用）
+  function ensureLocSelects() {
+    var f = document.getElementById('f-loc');
+    if (f && !f.options.length) { f.innerHTML = locOptionsHtml('卧室 · 床头柜抽屉'); }
+    var m = document.getElementById('m-loc');
+    if (m && !m.options.length) { m.innerHTML = locOptionsHtml('药箱 · 上层'); }
+  }
+  ensureLocSelects();
   renderMembers();
   renderFamily();
   renderSelfCard();
