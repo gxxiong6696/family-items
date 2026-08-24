@@ -528,7 +528,7 @@
             </div>
           </section>
 
-          <section class="pad" data-od-id="item-list">
+          <section class="pad" data-od-id="item-list" id="item-list">
             <div class="item-row" data-action="go-detail" data-item="布洛芬缓释胶囊">
               <div class="item-thumb">
                 <svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="3"/><path d="M9 8h6M9 12h6M9 16h4"/></svg>
@@ -976,6 +976,8 @@
 
           <section class="pad" style="padding-top: 4px;">
             <div class="camera-view" data-od-id="medicine-camera">
+              <video id="cam-preview" playsinline muted autoplay style="position:absolute; inset:0; width:100%; height:100%; object-fit:cover; transition:opacity .2s; background:#23231F;"></video>
+              <div id="camera-hint" style="position:absolute; inset:0; display:none; align-items:center; justify-content:center; text-align:center; color:rgba(255,255,255,.9); font-size:14px; padding:0 24px; z-index:1; box-sizing:border-box;"></div>
               <div class="frame-line"></div>
               <div class="scan-tip">
                 对准药品包装上的日期区域
@@ -1638,6 +1640,88 @@
     showPage('page-home');
   }
 
+  /* ── 物品库持久化（localStorage）+ 客户端图像识别（渐进增强） ── */
+  var ITEMS_KEY = 'FAMILY_ITEMS_KEY';
+  function loadUserItems() {
+    try { var v = localStorage.getItem(ITEMS_KEY); if (v) return JSON.parse(v) || []; } catch (e) {}
+    return [];
+  }
+  function saveUserItems(arr) {
+    try { localStorage.setItem(ITEMS_KEY, JSON.stringify(arr)); } catch (e) {}
+  }
+  function upsertUserItem(obj) {
+    var arr = loadUserItems();
+    arr.unshift(obj);
+    saveUserItems(arr);
+    return arr;
+  }
+  // 把用户新增物品合并进 ITEM_DETAILS，让详情页也能显示
+  function mergeUserItemsIntoDetails() {
+    loadUserItems().forEach(function (it) {
+      if (it && it.name) {
+        ITEM_DETAILS[it.name] = {
+          badge: it.badge || 'ok', badgeText: it.badgeText || '正常',
+          meta: (it.category || '物品') + ' · 添加于 ' + (it.added || '') + (it.member ? ' · @' + it.member : ''),
+          loc: it.loc || '未设置', qty: it.qty || '1', prod: it.prod || '—', exp: it.exp || '—', batch: it.batch || '—',
+          tags: it.tags || '', note: it.note || ''
+        };
+      }
+    });
+  }
+
+  var _mobilenet = null, _mnetReady = false;
+  function loadScript(src, cb) {
+    var s = document.createElement('script');
+    s.src = src; s.async = true;
+    s.onload = cb; s.onerror = function () {};
+    document.head.appendChild(s);
+  }
+  function ensureRecognitionModel(cb) {
+    if (_mnetReady) { if (cb) cb(true); return; }
+    if (!window.mobilenet) {
+      loadScript('https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js', function () {
+        loadScript('https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2.1.1/dist/mobilenet.min.js', function () {
+          if (window.mobilenet) {
+            window.mobilenet.load({ version: 2, alpha: 0.25 }).then(function (m) {
+              _mobilenet = m; _mnetReady = true; if (cb) cb(true);
+            }).catch(function () { if (cb) cb(false); });
+          } else { if (cb) cb(false); }
+        });
+      });
+    } else {
+      window.mobilenet.load({ version: 2, alpha: 0.25 }).then(function (m) {
+        _mobilenet = m; _mnetReady = true; if (cb) cb(true);
+      }).catch(function () { if (cb) cb(false); });
+    }
+    setTimeout(function () { if (!_mnetReady && cb) cb(false); }, 8000);
+  }
+  var RECOG_MAP = {
+    'pill': '药品', 'pill bottle': '药品', 'medicine chest': '药品', 'medicine': '药品', 'soup bowl': '食品',
+    'headphone': '数码 3C', 'earphone': '数码 3C', 'cellular telephone': '数码 3C', 'mobile phone': '数码 3C', 'remote control': '数码 3C', 'radio': '数码 3C', 'iPod': '数码 3C', 'laptop': '数码 3C', 'computer keyboard': '数码 3C', 'mouse': '数码 3C', 'television': '数码 3C', 'monitor': '数码 3C', 'digital watch': '数码 3C', 'camera': '数码 3C', 'pendrive': '数码 3C', 'accesory': '数码 3C', 'notebook': '数码 3C', 'library': '数码 3C', 'cellular telephone': '数码 3C',
+    'refrigerator': '家电', 'microwave': '家电', 'oven': '家电', 'wok': '家电', 'frying pan': '家电', 'coffee maker': '家电', 'toaster': '家电', 'dishwasher': '家电', 'washer': '家电', 'space heater': '家电', 'vacuum': '家电', 'iron': '家电', 'electric fan': '家电', 'computer': '家电', 'washing machine': '家电', 'crossword puzzle': '家电',
+    'bookcase': '证件', 'bookshelf': '证件', 'file': '证件', 'folder': '证件', 'briefcase': '证件', 'envelope': '证件', 'menu': '证件', 'library': '证件', 'camera': '证件', 'passport': '证件', 'book jacket': '证件', 'comic book': '证件', 'desk': '证件',
+    'carton': '日用', 'box': '日用', 'bag': '日用', 'basket': '日用', 'pot': '日用', 'vase': '日用', 'plastic bag': '日用', 'tray': '日用', 'bucket': '日用', 'can opener': '日用', 'bottle': '日用', 'water bottle': '日用', 'cup': '日用', 'mug': '日用', 'plate': '日用', 'table lamp': '日用', 'lampshade': '日用', 'wardrobe': '日用', 'cabinet': '日用', 'doormat': '日用', 'hair spray': '日用', 'lotion': '日用', 'toothbrush': '用品', 'perfume': '用品', 'soap dispenser': '用品', 'hair dryer': '用品', 'cleaning products': '日用', 'syringe': '医疗', 'stethoscope': '医疗', 'band-aid': '医疗'
+  };
+  function recognizeItem(dataUrl, cb) {
+    // 优先客户端模型；失败回退到 null，调用方降级手动
+    if (!_mobilenet) { if (cb) cb(null); return; }
+    var img = new Image();
+    img.onload = function () {
+      _mobilenet.classify(img, 3).then(function (preds) {
+        var topLabel = (preds && preds[0] && preds[0].className) ? preds[0].className.toLowerCase() : '';
+        var cat = '';
+        for (var k in RECOG_MAP) { if (topLabel.indexOf(k) >= 0) { cat = RECOG_MAP[k]; break; } }
+        var name = '';
+        if (preds && preds[0] && preds[1]) {
+          name = (preds[0].className.split(','))[0].trim();
+        }
+        if (cb) cb({ category: cat || (preds && preds[0] ? '其他' : ''), label: topLabel, name: name });
+      }).catch(function () { if (cb) cb(null); });
+    };
+    img.onerror = function () { if (cb) cb(null); };
+    img.src = dataUrl;
+  }
+
   /* ── 物品详情数据（点击物品行时动态填充） ── */
   var ITEM_DETAILS = {
     '布洛芬缓释胶囊': { badge: 'danger', badgeText: '剩 6 天', meta: '药品 · 添加于 2025-03-12 · @m1', loc: '药箱 · 上层', qty: '2 盒', prod: '2025-03-12', exp: '2026-08-29', batch: '250312A', tags: '<span class="tag" style="margin-right: 6px;">常用</span><span class="tag">需冷藏?</span>', note: '饭后服用，开封后 6 个月内用完。备用药，注意别让小朋友拿到。' },
@@ -1718,7 +1802,7 @@
       case 'go-scan':        inFlow = true; showPage('page-scan'); startCamera(); break;
       case 'go-scan-error':  inFlow = true; showPage('page-scan-error'); break;
       case 'go-scanning':    inFlow = true; showPage('page-scanning'); break;
-      case 'go-medicine':    inFlow = true; showPage('page-medicine'); break;
+      case 'go-medicine':    inFlow = true; showPage('page-medicine'); startCamera(); break;
       case 'go-medicine-error': inFlow = true; showPage('page-medicine-error'); break;
       case 'go-medicine-scanning': inFlow = true; showPage('page-medicine-scanning'); break;
       default: break;
@@ -1728,8 +1812,9 @@
   /* ── 摄像头控制（真实取景预览） ── */
   var camStream = null, camVideo = null, camHint = null;
   function ensureCamEls() {
-    if (!camVideo) camVideo = document.getElementById('cam-preview');
-    if (!camHint)  camHint  = document.getElementById('camera-hint');
+    var cv = document.querySelector('.page.active .camera-view');
+    camVideo = cv ? cv.querySelector('#cam-preview') : null;
+    camHint  = cv ? cv.querySelector('#camera-hint') : null;
   }
   function showCamError(msg) {
     ensureCamEls();
@@ -1796,26 +1881,126 @@
     stopCamera();
     inFlow = true;
     showPage('page-scanning');
-    setTimeout(function () {
-      var img = document.querySelector('#page-scan-confirm .captured');
-      if (img && frame) img.src = frame;
-      showPage('page-scan-confirm');
-    }, 1600);
+    ensureRecognitionModel(function (ok) {
+      recognizeItem(frame, function (res) {
+        var img = document.querySelector('#page-scan-confirm .ph-img');
+        if (img && frame) img.src = frame;
+        // 识别回填：名称/分类/位置（仅当页面仍停留在确认页才写）
+        if (res && res.category) {
+          var fname = document.getElementById('f-name');
+          if (fname && (!res.name || res.name.indexOf(',') >= 0)) {
+            fname.textContent = (res.name ? res.name.split(',')[0].trim() : (res.category === '其他' ? '' : res.category));
+          } else if (fname && res.name) {
+            fname.textContent = res.name.split(',')[0].trim();
+          }
+          var tags = document.querySelectorAll('#page-scan-confirm .field .row .tag');
+          tags.forEach(function (t) { t.classList.remove('active'); });
+          tags.forEach(function (t) {
+            if (t.textContent.trim() === res.category) t.classList.add('active');
+          });
+        }
+        showPage('page-scan-confirm');
+      });
+    });
   });
 
   document.getElementById('save-item').addEventListener('click', function () {
+    var nameEl = document.getElementById('f-name');
+    var locEl = document.getElementById('f-loc');
+    var qtyEl = document.getElementById('f-qty');
+    var tagEl = document.getElementById('f-tag');
+    var name = nameEl ? nameEl.textContent.trim() : '新物品';
+    var cat = '其他';
+    var tags = document.querySelectorAll('#page-scan-confirm .field .row .tag');
+    tags.forEach(function (t) { if (t.classList.contains('active')) cat = t.textContent.trim(); });
+    var today = new Date();
+    var dstr = today.toISOString().slice(0, 10);
+    upsertUserItem({
+      name: name,
+      category: cat,
+      loc: locEl ? locEl.textContent.trim() : '未设置',
+      qty: qtyEl ? qtyEl.textContent.trim() : '1',
+      tags: tagEl ? tagEl.textContent.trim() : '',
+      badge: 'ok', badgeText: '正常', added: dstr, member: '1',
+      note: '', prod: '—', exp: '—', batch: '—'
+    });
+    mergeUserItemsIntoDetails();
+    prependItemRow(name, cat, locEl ? locEl.textContent.trim() : '未设置', qtyEl ? qtyEl.textContent.trim() : '1');
     toast('已加入物品库');
     setTimeout(goHome, 700);
   });
 
+  function prependItemRow(name, cat, loc, qty) {
+    var listEl = document.getElementById('item-list');
+    if (!listEl || !name) return;
+    var row = document.createElement('div');
+    row.className = 'item-row';
+    row.setAttribute('data-action', 'go-detail');
+    row.setAttribute('data-item', name);
+    var icon = '<div class="item-thumb"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></div>';
+    row.innerHTML = icon + '<div><div class="i-name"></div><div class="i-sub"></div></div><span class="badge ok">正常</span>';
+    row.querySelector('.i-name').textContent = name;
+    row.querySelector('.i-sub').textContent = loc + (qty && qty !== '1' ? ' · ' + qty : '');
+    listEl.insertBefore(row, listEl.firstChild);
+  }
+
   /* ── 药品扫描流程 ── */
   document.getElementById('shutter-med').addEventListener('click', function () {
+    var frame = grabFrame();
+    window.__lastShotDataURL = frame;
+    stopCamera();
     inFlow = true;
     showPage('page-medicine-scanning');
-    setTimeout(function () { showPage('page-medicine-confirm'); }, 1800);
+    ensureRecognitionModel(function (ok) {
+      recognizeItem(frame, function (res) {
+        var img = document.querySelector('#page-medicine-confirm .ph-img');
+        if (img && frame) img.src = frame;
+        if (res && res.category) {
+          var mname = document.getElementById('m-name');
+          if (mname && res.name) mname.textContent = res.name.split(',')[0].trim();
+          // 药品类：把存放位置切到药箱
+          var locTags = document.querySelectorAll('#page-medicine-confirm .field .row .tag');
+          locTags.forEach(function (t) { t.classList.remove('active'); });
+          locTags.forEach(function (t) {
+            if (t.textContent.indexOf('药箱') >= 0) t.classList.add('active');
+          });
+        }
+        showPage('page-medicine-confirm');
+      });
+    });
   });
 
   document.getElementById('save-medicine').addEventListener('click', function () {
+    var nameEl = document.getElementById('m-name');
+    var prodEl = document.getElementById('m-prod');
+    var expEl = document.getElementById('m-exp');
+    var batchEl = document.getElementById('m-batch');
+    var name = nameEl ? nameEl.textContent.trim() : '药品';
+    var prod = prodEl ? prodEl.textContent.trim() : '';
+    var exp = expEl ? expEl.textContent.trim() : '';
+    var batch = batchEl ? batchEl.textContent.trim() : '';
+    var loc = '药箱 · 上层';
+    var locTags = document.querySelectorAll('#page-medicine-confirm .field .row .tag');
+    locTags.forEach(function (t) { if (t.classList.contains('active')) loc = t.textContent.trim(); });
+    var today = new Date();
+    var dstr = today.toISOString().slice(0, 10);
+    var badge = 'ok', badgeText = '正常';
+    if (exp) {
+      var expDate = new Date(exp);
+      if (!isNaN(expDate.getTime())) {
+        var days = Math.round((expDate.getTime() - today.getTime()) / 86400000);
+        if (days <= 0) { badge = 'danger'; badgeText = '已过期'; }
+        else if (days <= 30) { badge = 'warn'; badgeText = days + ' 天'; }
+      }
+    }
+    upsertUserItem({
+      name: name, category: '药品',
+      loc: loc, qty: '1', tags: '<span class="tag" style="margin-right: 6px;">常用</span>',
+      badge: badge, badgeText: badgeText, added: dstr, member: '1',
+      note: '效期：' + (exp || '不限'), prod: prod, exp: exp, batch: batch
+    });
+    mergeUserItemsIntoDetails();
+    prependItemRow(name, '药品', loc, '');
     toast('已加入药品库并挂提醒');
     setTimeout(goHome, 700);
   });
@@ -1888,6 +2073,8 @@
         }, 300);
       }
     }
+    // 加载已保存物品到详情数据（刷新后新增物品仍可查）
+    mergeUserItemsIntoDetails();
   })();
 </script>
 </body>
