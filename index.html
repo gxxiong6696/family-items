@@ -2607,20 +2607,31 @@
     });
   }
   // 位置树计数（数据驱动：按物品 loc 首段聚合回填 .loc-count）+ 位置页 header
+  // 修复：房间级 + 子位级两级都按数据聚合，物品清空后计数归零，避免写死计数误显示“内有物品”
   function refreshLocationCounts() {
     var items = getAllItems();
-    var byRoom = {};
+    var byRoom = {}, byLoc = {};
     items.forEach(function (it) {
-      var room = (it.loc || '').split(' · ')[0].trim();
+      var loc = (it.loc || '').trim();
+      var room = loc.split(' · ')[0].trim();
       if (room) byRoom[room] = (byRoom[room] || 0) + 1;
+      if (loc) byLoc[loc] = (byLoc[loc] || 0) + 1;
     });
     document.querySelectorAll('#page-locations .loc-node').forEach(function (node) {
       var nameEl = node.querySelector('.loc-head span');
       var countEl = node.querySelector('.loc-count');
-      if (!nameEl || !countEl) return;
+      if (!nameEl) return;
       var name = nameEl.textContent.trim();
-      var n = byRoom[name] || 0;
-      countEl.textContent = n + ' 件';
+      if (countEl) countEl.textContent = (byRoom[name] || 0) + ' 件';
+      // 子位置计数：按 “房间 · 子位” 全名聚合；子位名可能是“电视柜 · 抽屉 1”这类多层名
+      node.querySelectorAll('.loc-child').forEach(function (child) {
+        var cNameEl = child.querySelector('span');
+        var cCountEl = child.querySelector('.loc-count');
+        if (!cNameEl || !cCountEl) return;
+        var childName = cNameEl.textContent.trim();
+        var fullLabel = name && childName ? name + ' · ' + childName : childName;
+        cCountEl.textContent = (byLoc[fullLabel] || 0) + ' 件';
+      });
     });
     var locHeader = document.querySelector('[data-loc-header]');
     if (locHeader) {
