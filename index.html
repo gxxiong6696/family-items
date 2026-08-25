@@ -469,7 +469,8 @@
           <section class="pad" style="margin-bottom: 16px;">
             <div class="radar-card" data-od-id="radar-card">
               <p class="radar-title">药品临期雷达</p>
-              <p class="radar-sub">2 件药品 30 天内到期，1 件已过期</p>
+              <p class="radar-sub" id="radar-sub">2 件药品 30 天内到期，1 件已过期</p>
+              <div id="radar-rows">
               <div class="radar-row" data-action="go-reminders">
                 <span class="r-dot" style="background:#F2C14E;"></span>
                 <span class="r-name">布洛芬缓释胶囊</span>
@@ -484,6 +485,7 @@
                 <span class="r-dot" style="background:#F06B5E;"></span>
                 <span class="r-name">感冒灵颗粒</span>
                 <span class="r-date">过期 12 天</span>
+              </div>
               </div>
             </div>
           </section>
@@ -734,7 +736,7 @@
         <section class="page" id="page-reminders" data-od-id="page-reminders">
           <div class="header">
             <div>
-              <p class="greeting">3 条待处理</p>
+              <p class="greeting" id="reminder-greeting">3 条待处理</p>
               <h1>提醒中心</h1>
             </div>
           </div>
@@ -748,7 +750,7 @@
             </div>
           </section>
 
-          <section class="pad stack" style="gap: 12px;">
+          <section class="pad stack" id="reminder-list" style="gap: 12px;">
             <div class="card" style="border-left: 0;">
               <div class="row-between" style="margin-bottom: 10px;">
                 <span class="pill" style="background: var(--danger-soft); color: var(--danger);">已过期</span>
@@ -1755,14 +1757,20 @@
   }
   function upsertUserItem(obj) {
     var arr = loadUserItems();
+    // 真正的 upsert：同名条目先剔除再前插。
+    // 修复：编辑物品（不改名）时旧条目不再残留，避免同名重复、旧值(旧存放位/数量/效期)覆盖新值。
+    arr = arr.filter(function (it) { return !(it && it.name && it.name === obj.name); });
     arr.unshift(obj);
     saveUserItems(arr);
     return arr;
   }
   // 把用户新增物品合并进 ITEM_DETAILS，让详情页也能显示
   function mergeUserItemsIntoDetails() {
+    var seen = {};
     loadUserItems().forEach(function (it) {
-      if (it && it.name) {
+      // 同名只取最新（数组中靠前）一条，防止历史残留的旧条目（旧存放位/数量/效期）反向覆盖新值
+      if (it && it.name && !seen[it.name]) {
+        seen[it.name] = 1;
         ITEM_DETAILS[it.name] = {
           badge: it.badge || 'ok', badgeText: it.badgeText || '正常',
           meta: (it.category || '物品') + ' · 添加于 ' + (it.added || '') + (it.member ? ' · @' + it.member : ''),
@@ -1844,6 +1852,8 @@
             toast('导入失败：文件结构无法识别');
           }
           mergeUserItemsIntoDetails();
+          renderItemLists();
+          renderReminderCenter();
           renderMembers();
           renderFamily();
           renderSelfCard();
@@ -2154,6 +2164,7 @@
     // 刷新计数（按新名字首段重新聚合）
     refreshItemStatsAll();
     renderItemLists();
+    renderReminderCenter(); // 位置改名会改 item.loc，提醒中心/雷达卡片也展示位置，需一并同步
     window._editingLocOld = null;
     showPage('page-locations');
     toast('位置已更新');
@@ -2288,6 +2299,7 @@
     // 同步静态列表行，让回到列表也能看到改后的名称/位置/数量
     syncItemRow(_viewingItem, newName, loc, qty);
     renderItemLists();
+    renderReminderCenter();
     _viewingItem = newName;
     fillDetail(newName);
     resetDetailEditMode();
@@ -2503,6 +2515,7 @@
     });
     mergeUserItemsIntoDetails();
     renderItemLists();
+    renderReminderCenter();
     toast('已加入物品库');
     setTimeout(goHome, 700);
   });
@@ -2621,6 +2634,120 @@
     refreshItemStats();
     refreshLocationCounts();
   }
+
+  /* ── 药品临期雷达 + 提醒中心：数据驱动渲染（随删除/新增/编辑同步刷新） ── */
+  // 计算距目标日期的剩余天数（负数=已过期）；无效日期返回 null
+  function daysUntil(dateStr) {
+    if (!dateStr) return null;
+    var d = new Date(dateStr);
+    if (isNaN(d.getTime())) return null;
+    var today = new Date(); today.setHours(0, 0, 0, 0);
+    d.setHours(0, 0, 0, 0);
+    return Math.round((d.getTime() - today.getTime()) / 86400000);
+  }
+  // 取某物品的效期日期（优先 ITEM_DETAILS，其次用户物品，兜底 '-'）
+  function itemExp(name) {
+    var d = ITEM_DETAILS && ITEM_DETAILS[name];
+    if (d && d.exp && d.exp !== '—' && d.exp !== '-') return d.exp;
+    var user = loadUserItems();
+    for (var i = 0; i < user.length; i++) { if (user[i] && user[i].name === name && user[i].exp) return user[i].exp; }
+    return null;
+  }
+  // 取某物品的保修注记（用于“保修到期”类提醒；无则返回 null）
+  function itemWarrantyNote(name) {
+    var d = ITEM_DETAILS && ITEM_DETAILS[name];
+    var note = d && d.note ? d.note : '';
+    if (note.indexOf('保修') >= 0) return note;
+    return null;
+  }
+  // 重绘主页雷达区与提醒中心（数据驱动）
+  function renderReminderCenter() {
+    var items = getAllItems();
+    var expiring = [], expired = [], warranty = [];
+    items.forEach(function (it) {
+      var exp = itemExp(it.name);
+      if (exp) {
+        var days = daysUntil(exp);
+        if (days !== null) {
+          if (days < 0) { expired.push({ name: it.name, loc: it.loc, days: days, exp: exp }); }
+          else if (days <= 30) { expiring.push({ name: it.name, loc: it.loc, days: days, exp: exp }); }
+        }
+      }
+      var w = itemWarrantyNote(it.name);
+      if (w) warranty.push({ name: it.name, loc: it.loc, note: w });
+    });
+    // 雷达区
+    var radarRows = document.getElementById('radar-rows');
+    var radarSub = document.getElementById('radar-sub');
+    if (radarRows) {
+      radarRows.innerHTML = '';
+      function mkRow(item, dotColor, dateText) {
+        var row = document.createElement('div');
+        row.className = 'radar-row';
+        row.setAttribute('data-action', 'go-reminders');
+        row.innerHTML = '<span class="r-dot" style="background:' + dotColor + ';"></span>' +
+          '<span class="r-name"></span><span class="r-date"></span>';
+        row.querySelector('.r-name').textContent = item.name;
+        row.querySelector('.r-date').textContent = dateText;
+        radarRows.appendChild(row);
+      }
+      var total30 = expiring.length, totalExp = expired.length;
+      if (total30 + totalExp === 0) {
+        radarRows.innerHTML = '<div style="font-size:12px;color:rgba(255,255,255,.85);padding:6px 0;">暂无临期药品</div>';
+      } else {
+        expired.slice(0, 3).forEach(function (r) { mkRow(r, '#F06B5E', '过期 ' + Math.abs(r.days) + ' 天'); });
+        expiring.slice(0, 3).forEach(function (r) { mkRow(r, '#F2C14E', '剩 ' + r.days + ' 天'); });
+      }
+      if (radarSub) radarSub.textContent = total30 + totalExp + ' 件药品 30 天内到期' + (totalExp ? '，' + totalExp + ' 件已过期' : '');
+    }
+    // 提醒中心
+    var list = document.getElementById('reminder-list');
+    var greeting = document.getElementById('reminder-greeting');
+    if (list) {
+      var total = expired.length + expiring.length + warranty.length;
+      if (greeting) greeting.textContent = total + ' 条待处理';
+      list.innerHTML = '';
+      if (total === 0) {
+        list.innerHTML = '<div class="card" style="border-left:0;"><div class="empty-state"><div class="empty-icon"><svg viewBox="0 0 24 24"><path d="M12 3l8 4v5c0 4.5-3.2 7.8-8 9-4.8-1.2-8-4.5-8-9V7z"/><path d="M9 12l2 2 4-4"/></svg></div><h3>暂无待处理提醒</h3><p>所有物品都在有效期内。</p></div></div>';
+        return;
+      }
+      function card(title, pill, pillStyle, rows) {
+        var c = document.createElement('div');
+        c.className = 'card';
+        c.style.borderLeft = '0';
+        var head = '<div class="row-between" style="margin-bottom:10px;"><span class="pill" style="' + pillStyle + '">' + pill + '</span><span class="meta">' + rows.length + ' 件</span></div>';
+        var body = '';
+        rows.forEach(function (r, i) {
+          var sep = i < rows.length - 1 ? 'border-bottom:1px solid var(--border);' : '';
+          body += '<div class="row" style="gap:12px;padding:8px 0;' + sep + '">' +
+            '<div class="item-thumb" style="width:44px;height:44px;"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg></div>' +
+            '<div style="flex:1;"><div class="c-name" style="font-weight:600;font-size:14px;"></div><div class="meta" style="font-size:11px;"></div></div>' +
+            '<span class="num c-days" style="color:var(--warn);font-weight:600;"></span></div>';
+        });
+        c.innerHTML = head + body;
+        // 填充各行数据（用明确 class，避免误触 item-thumb 图标）
+        var els = c.querySelectorAll('.row');
+        rows.forEach(function (r, i) {
+          var el = els[i];
+          if (!el) return;
+          var nameEl = el.querySelector('.c-name');
+          if (nameEl) nameEl.textContent = r.name;
+          var metaEl = el.querySelector('.meta');
+          if (metaEl) metaEl.textContent = (r.loc ? r.loc + ' · ' : '') + (r.dateSuffix || '');
+          var num = el.querySelector('.c-days');
+          if (num) {
+            if (r.days !== undefined) { num.textContent = (r.days < 0 ? '过期 ' + Math.abs(r.days) : r.days) + ' 天'; }
+            else { num.textContent = r.noteNum || ''; }
+          }
+        });
+        list.appendChild(c);
+      }
+      if (expired.length) card('已过期', '已过期', 'background:var(--danger-soft);color:var(--danger);', expired.map(function (r) { return { name: r.name, loc: r.loc, days: r.days, dateSuffix: '已于 ' + (r.exp || '') + ' 过期' }; }));
+      if (expiring.length) card('30 天内', '30 天内', 'background:var(--warn-soft);color:var(--warn);', expiring.map(function (r) { return { name: r.name, loc: r.loc, days: r.days, dateSuffix: '有效期至 ' + (r.exp || '') }; }));
+      if (warranty.length) card('保修', '保修', '', warranty.map(function (r) { return { name: r.name, loc: r.loc, dateSuffix: r.note.replace(/保修/, '保修至'), noteNum: '留意' }; }));
+    }
+  }
+
   // 真删除：从 localStorage + ITEM_DETAILS + 列表 DOM + 演示记录一处移除
   function deleteItem(name) {
     if (!name) return;
@@ -2635,8 +2762,9 @@
     var del = loadDeleted();
     if (del.indexOf(name) < 0) del.push(name);
     saveDeleted(del);
-    // 重建列表
+    // 重建列表 + 同步刷新提醒中心/主页雷达
     renderItemLists();
+    renderReminderCenter();
     toast('已删除');
     goHome();
   }
@@ -2722,6 +2850,7 @@
     });
     mergeUserItemsIntoDetails();
     renderItemLists();
+    renderReminderCenter();
     toast('已加入药品库并挂提醒');
     setTimeout(goHome, 700);
   });
@@ -2764,6 +2893,7 @@
   ensureLocSelects();
   restoreLocations();
   renderItemLists();
+  renderReminderCenter();
   refreshItemStatsAll();
   injectLocEditButtons();
   renderMembers();
