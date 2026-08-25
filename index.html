@@ -151,6 +151,26 @@
   .card.flat { background: transparent; border: 0; padding: 12px 0; border-top: 1px solid var(--border); border-radius: 0; }
   .card.flat:first-child { border-top: 0; padding-top: 0; }
 
+  /* ─── 加入桌面/安装引导卡 ─── */
+  .install-card {
+    display: flex; gap: 14px; align-items: flex-start;
+    background: linear-gradient(135deg, var(--accent-soft), color-mix(in oklch, var(--accent) 7%, var(--surface)));
+    border-color: color-mix(in oklch, var(--accent) 30%, var(--border));
+    margin: 0 0 16px;
+  }
+  .install-icon {
+    width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0;
+    background: var(--accent); display: grid; place-items: center; color: #fff;
+  }
+  .install-icon svg { width: 22px; height: 22px; stroke: #fff; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  .install-body { flex: 1; min-width: 0; }
+  .install-title { font-family: var(--font-display); font-size: 16px; font-weight: 600; color: var(--fg); margin-bottom: 3px; }
+  .install-sub { font-size: 12px; color: var(--muted); line-height: 1.5; margin-bottom: 12px; }
+  .install-actions { display: flex; gap: 10px; }
+  .install-actions .btn-primary { flex: 1; }
+  .install-card .btn-primary { background: var(--accent-deep); }
+  .install-actions .btn-secondary { flex: 0 0 auto; padding-inline: 14px; }
+
   .btn-primary, .btn-secondary {
     display: flex; align-items: center; justify-content: center; gap: 8px;
     width: 100%; min-height: 48px; padding: 14px 20px; border-radius: 14px;
@@ -420,6 +440,23 @@
               <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
             </button>
           </div>
+
+          <!-- 加入桌面/安装引导（仅在可安装且未安装时显示） -->
+          <section class="pad" id="install-wrap">
+            <div class="card install-card" id="install-card" style="display:none;">
+              <div class="install-icon">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M4 19h16"/></svg>
+              </div>
+              <div class="install-body">
+                <div class="install-title">把它放到桌面</div>
+                <div class="install-sub">像 App 一样打开，拍照、扫码、查看提醒都更方便</div>
+                <div class="install-actions">
+                  <button class="btn-primary install-btn" id="install-btn" data-action="install-prompt">加入桌面</button>
+                  <button class="btn-secondary" id="install-dismiss" data-action="install-dismiss">稍后</button>
+                </div>
+              </div>
+            </div>
+          </section>
 
           <section class="pad" style="margin-bottom: 16px;">
             <div class="radar-card" data-od-id="radar-card">
@@ -2630,6 +2667,93 @@
     }
     // 加载已保存物品到详情数据（刷新后新增物品仍可查）
     mergeUserItemsIntoDetails();
+
+    // 3) 加入桌面/安装引导：捕获原生安装提示；等不到时给手动引导兜底
+    var deferredPrompt = null;
+    var installCard = document.getElementById('install-card');
+    var installBtn = document.getElementById('install-btn');
+    var installDismiss = document.getElementById('install-dismiss');
+    var isStandalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
+      (window.navigator.standalone === true);
+    var manualMode = false; // 无原生提示时，卡片进入手动引导模式
+    var INSTALL_DISMISS_KEY = 'family-install-dismissed';
+
+    function wasDismissed() {
+      try { return sessionStorage.getItem(INSTALL_DISMISS_KEY) === '1'; } catch (e) { return false; }
+    }
+    function markDismissed() {
+      try { sessionStorage.setItem(INSTALL_DISMISS_KEY, '1'); } catch (e) {}
+    }
+
+    function showInstallCard() {
+      if (installCard) installCard.style.display = 'flex';
+    }
+
+    function showManualGuide() {
+      if (!installCard || isStandalone || wasDismissed()) return;
+      manualMode = true;
+      var sub = installCard.querySelector('.install-sub');
+      if (sub) {
+        if (isIOS) sub.textContent = '点击底部分享按钮，选择“添加到主屏幕”即可像 App 一样使用';
+        else sub.textContent = '点右上角菜单里的“添加到主屏幕”，或“安装应用”，就能像 App 一样时刻打开';
+      }
+      var btn = installCard.querySelector('#install-btn');
+      if (btn) btn.textContent = '知道了';
+      showInstallCard();
+    }
+
+    // 桌面/Android Chrome：等到浏览器可安装事件再弹（此时按钮是真正的“加入桌面”并触发原生 prompt）
+    window.addEventListener('beforeinstallprompt', function (e) {
+      e.preventDefault();
+      deferredPrompt = e;
+      if (!installCard || isStandalone || wasDismissed()) return;
+      manualMode = false;
+      var sub = installCard.querySelector('.install-sub');
+      if (sub) sub.textContent = '像 App 一样打开，拍照、扫码、查看提醒都更方便';
+      var btn = installCard.querySelector('#install-btn');
+      if (btn) btn.textContent = '加入桌面';
+      showInstallCard();
+    });
+
+    // iOS Safari 不支持 beforeinstallprompt：稍等片刻给手动引导
+    var isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream;
+    if (isIOS) {
+      setTimeout(showManualGuide, 1200);
+    } else {
+      // 兜底：若 3 秒内没等到 beforeinstallprompt（已安装过/删除后浏览器不再触发），也给手动引导
+      setTimeout(function () {
+        if (!deferredPrompt) showManualGuide();
+      }, 3000);
+    }
+
+    // 点“加入桌面/知道了”：有原生提示则触发 prompt()，否则是手动引导点“知道了”直接收起
+    if (installBtn) {
+      installBtn.addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        if (!manualMode && deferredPrompt) {
+          deferredPrompt.prompt();
+          deferredPrompt.userChoice.then(function () {
+            deferredPrompt = null;
+            if (installCard) installCard.style.display = 'none';
+          });
+        } else {
+          if (installCard) installCard.style.display = 'none';
+        }
+      });
+    }
+    // 点“稍后”：收起并记住，免得每次进来都打扰
+    if (installDismiss) {
+      installDismiss.addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        markDismissed();
+        if (installCard) installCard.style.display = 'none';
+      });
+    }
+    // 已安装（standalone 或 appinstalled 事件）后隐藏卡片
+    window.addEventListener('appinstalled', function () {
+      isStandalone = true;
+      if (installCard) installCard.style.display = 'none';
+    });
   })();
 </script>
 </body>
