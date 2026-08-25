@@ -1369,7 +1369,7 @@
           </section>
 
           <section class="pad" style="padding-top: 8px;">
-            <button class="btn-primary" data-action="go-locations" data-toast="位置已创建">创建位置</button>
+            <button class="btn-primary" data-action="create-location">创建位置</button>
           </section>
         </section>
       </main>
@@ -1883,7 +1883,142 @@
       var sel = (o === selectedLoc) ? ' selected' : '';
       s += '<option value="' + o + '"' + sel + '>' + o + '</option>';
     });
+    // 追加已保存的自定义位置（去重），让新增的位置也能被选用
+    var extra = loadLocations();
+    extra.forEach(function (item) {
+      if (!item || !item.name) return;
+      var label = item.name;
+      if (item.parent) label = item.parent + ' · ' + item.name;
+      var found = false;
+      for (var i = 0; i < LOC_OPTIONS.length; i++) { if (LOC_OPTIONS[i] === label) { found = true; break; } }
+      if (!found) {
+        var el = (label === selectedLoc) ? ' selected' : '';
+        s += '<option value="' + label + '"' + el + '>' + label + '</option>';
+      }
+    });
     return s;
+  }
+
+  /* ── 新增存放位置：真正保存数据（不再只是跳页+toast） ── */
+  var LOCATIONS_KEY = 'family-locations';
+
+  // 读取已保存的自定义位置数组；无则返回空数组
+  function loadLocations() {
+    try {
+      var raw = localStorage.getItem(LOCATIONS_KEY);
+      if (!raw) return [];
+      var arr = JSON.parse(raw);
+      return Array.isArray(arr) ? arr : [];
+    } catch (e) { return []; }
+  }
+
+  // 保存自定义位置数组到 localStorage
+  function saveLocations(arr) {
+    try { localStorage.setItem(LOCATIONS_KEY, JSON.stringify(arr)); } catch (e) {}
+  }
+
+  // 对位置名/备注做 HTML 转义，防止特殊字符破坏布局或注入
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (m) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m];
+    });
+  }
+
+  // 在指定 loc-node 的 children 里追加一个子位置
+  function appendChildToNode(node, label, count) {
+    var children = node.querySelector('.loc-children');
+    if (!children) return;
+    var child = document.createElement('div');
+    child.className = 'loc-child';
+    child.innerHTML = '<span>' + esc(label) + '</span><span class="loc-count">' + (count || '0 件') + '</span>';
+    children.appendChild(child);
+  }
+
+  // 新建一个顶级位置节点（房间）
+  function buildRoomNode(name, note) {
+    var node = document.createElement('div');
+    node.className = 'loc-node open';
+    var head = document.createElement('div');
+    head.className = 'loc-head';
+    head.setAttribute('data-role', 'toggle');
+    head.innerHTML = '<svg class="chev" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg>' +
+      '<span style="font-weight: 600; font-size: 14px; flex: 1;">' + esc(name) + '</span>' +
+      '<span class="loc-count">0 件</span>';
+    node.appendChild(head);
+    var children = document.createElement('div');
+    children.className = 'loc-children';
+    if (note) {
+      var c = document.createElement('div');
+      c.className = 'loc-child';
+      c.innerHTML = '<span>' + esc(note) + '</span><span class="loc-count">—</span>';
+      children.appendChild(c);
+    }
+    node.appendChild(children);
+    return node;
+  }
+
+  // 把(名称,上级,备注)追加到位置树；父级匹配失败时创建独立顶级节点
+  function addLocationToTree(host, name, parentLabel, note) {
+    if (!host || !name) return;
+    var isRoom = !parentLabel || parentLabel === '无（作为房间）';
+    if (isRoom) {
+      host.appendChild(buildRoomNode(name, note));
+      return;
+    }
+    var targetNode = null;
+    var nodes = host.querySelectorAll('.loc-node');
+    for (var i = 0; i < nodes.length; i++) {
+      var headEl = nodes[i].querySelector('.loc-head');
+      var titleEl = headEl ? headEl.querySelector('span') : null;
+      if (titleEl && titleEl.textContent.trim() === parentLabel) { targetNode = nodes[i]; break; }
+    }
+    if (targetNode) {
+      appendChildToNode(targetNode, name, '0 件');
+      targetNode.classList.add('open');
+    } else {
+      // 父级没找到：兜底为独立顶级节点，避免误插入到别的房间
+      host.appendChild(buildRoomNode(parentLabel + ' · ' + name, note));
+    }
+  }
+
+  // 核心：新增一条位置 → 保存到本地 + 追加到树
+  function addNewLocation() {
+    var nameEl = document.getElementById('loc-name');
+    var noteEl = document.getElementById('loc-note');
+    var parentEl = document.querySelector('#page-add-location .tag.active');
+    var parentLabel = parentEl ? parentEl.textContent.trim() : '';
+
+    var name = nameEl ? nameEl.textContent.trim() : '';
+    var note = noteEl ? noteEl.textContent.trim() : '';
+
+    if (!name) { toast('请输入位置名称'); return; }
+
+    // 1) 持久化到 localStorage
+    var arr = loadLocations();
+    arr.push({ name: name, parent: parentLabel === '无（作为房间）' ? '' : parentLabel, note: note, createdAt: Date.now() });
+    saveLocations(arr);
+
+    // 2) 追加到位置树
+    var host = document.querySelector('#page-locations .pad.stack');
+    addLocationToTree(host, name, parentLabel, note);
+
+    // 3) 回到位置页并提示
+    showPage('page-locations');
+    toast('位置已创建');
+  }
+
+  // 页面加载时：从 localStorage 恢复已保存的自定义位置
+  function restoreLocations() {
+    var arr = loadLocations();
+    if (!arr.length) return;
+    var host = document.querySelector('#page-locations .pad.stack');
+    if (!host) return;
+    arr.forEach(function (item) {
+      var name = item.name || '';
+      var parentLabel = item.parent || '';
+      if (!name) return;
+      addLocationToTree(host, name, parentLabel, item.note);
+    });
   }
 
   /* ── 物品详情数据（点击物品行时动态填充） ── */
@@ -1933,6 +2068,27 @@
     var views = document.getElementById('detail-views'); if (views) views.style.display = 'block';
     var form = document.getElementById('detail-edit-form'); if (form) form.style.display = 'none';
   }
+  // 编辑物品保存后 —— 同步所有静态列表行（首页"最近添加" + "全部物品"页）
+  function syncItemRow(oldName, newName, loc, qty) {
+    var d = ITEM_DETAILS[newName] || ITEM_DETAILS[oldName] || {};
+    var rows = Array.prototype.slice.call(document.querySelectorAll('.item-row')).filter(function (row) { return row.getAttribute('data-item') === oldName; });
+    rows.forEach(function (row) {
+      var nEl = row.querySelector('.i-name');
+      var subEl = row.querySelector('.i-sub');
+      var badgeEl = row.querySelector('.badge');
+      if (newName && oldName !== newName) row.setAttribute('data-item', newName);
+      if (nEl) nEl.textContent = newName || oldName;
+      if (subEl) {
+        var sub = loc || d.loc || '';
+        if (qty && qty !== '1') sub += ' · ' + qty;
+        if (!sub) sub = d.meta || '';
+        subEl.textContent = sub;
+      }
+      if (badgeEl && (d.badgeText || d.badge)) badgeEl.textContent = d.badgeText || '正常';
+      if (badgeEl && d.badge) badgeEl.className = 'badge ' + d.badge;
+    });
+  }
+
   function saveItemEdit() {
     var newName = (document.getElementById('ed-name') ? document.getElementById('ed-name').textContent.trim() : _viewingItem) || _viewingItem;
     var loc = (document.getElementById('ed-loc') ? document.getElementById('ed-loc').value : '') || '未设置';
@@ -1950,7 +2106,8 @@
     // 持久化到 localStorage（用户物品 + 演示物品都可编辑保存）
     upsertUserItem(cur);
     mergeUserItemsIntoDetails();
-    // 若改名，旧的演示条目设为别名；刷新详情视图
+    // 同步静态列表行，让回到列表也能看到改后的名称/位置/数量
+    syncItemRow(_viewingItem, newName, loc, qty);
     _viewingItem = newName;
     fillDetail(newName);
     resetDetailEditMode();
@@ -2014,6 +2171,7 @@
       case 'edit-family-name': openFamilyEdit(); break;
       case 'save-family-name': saveFamilyName(); break;
       case 'go-add-location': showPage('page-add-location'); break;
+      case 'create-location': addNewLocation(); break;
       case 'go-scan':        inFlow = true; showPage('page-scan'); startCamera(); break;
       case 'go-scan-error':  inFlow = true; showPage('page-scan-error'); break;
       case 'go-scanning':    inFlow = true; showPage('page-scanning'); break;
@@ -2283,6 +2441,7 @@
     if (m && !m.options.length) { m.innerHTML = locOptionsHtml('药箱 · 上层'); }
   }
   ensureLocSelects();
+  restoreLocations();
   renderMembers();
   renderFamily();
   renderSelfCard();
