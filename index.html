@@ -464,7 +464,7 @@
             </button>
           </section>
 
-          <section class="pad" style="margin-bottom: 8px;">
+          <section class="pad" style="margin-bottom: 8px;" id="recent-list">
             <div class="row-between" style="margin-bottom: 4px;">
               <h2 class="h3" style="font-family: var(--font-display); font-size: 18px;">最近添加</h2>
               <button style="background: none; border: 0; color: var(--accent-deep); font-size: 13px; font-weight: 500; cursor: pointer; padding: 8px 0;" data-action="go-items">查看全部</button>
@@ -506,7 +506,7 @@
         <section class="page" id="page-items" data-od-id="page-items">
           <div class="header">
             <div>
-              <p class="greeting">共 42 件物品</p>
+              <p class="greeting" data-item-total>共 42 件物品</p>
               <h1>全部物品</h1>
             </div>
             <button class="icon-btn" aria-label="新增物品" data-action="go-scan">
@@ -522,14 +522,14 @@
           </section>
 
           <section class="pad" style="margin-bottom: 8px;">
-            <div class="row" style="overflow-x: auto; padding-bottom: 4px;">
-              <span class="tag active">全部 42</span>
-              <span class="tag">药品 9</span>
-              <span class="tag">食品 7</span>
-              <span class="tag">家电 5</span>
-              <span class="tag">证件 4</span>
-              <span class="tag">衣物 6</span>
-              <span class="tag">其他 11</span>
+            <div class="row" style="overflow-x: auto; padding-bottom: 4px;" data-cat-tabs>
+              <span class="tag active" data-cat="all">全部</span>
+              <span class="tag" data-cat="药品">药品</span>
+              <span class="tag" data-cat="食品">食品</span>
+              <span class="tag" data-cat="家电">家电</span>
+              <span class="tag" data-cat="证件">证件</span>
+              <span class="tag" data-cat="衣物">衣物</span>
+              <span class="tag" data-cat="其他">其他</span>
             </div>
           </section>
 
@@ -601,7 +601,7 @@
         <section class="page" id="page-locations" data-od-id="page-locations">
           <div class="header">
             <div>
-              <p class="greeting">6 个房间 · 15 个收纳位</p>
+              <p class="greeting" data-loc-header>6 个房间 · 15 个收纳位</p>
               <h1>存放位置</h1>
             </div>
             <button class="icon-btn" aria-label="新增位置" data-action="go-add-location">
@@ -1199,7 +1199,7 @@
 
           <section class="pad stack" style="gap: 10px; margin-top: 16px;">
             <button class="btn-primary" data-action="edit-item">编辑物品</button>
-            <button class="btn-secondary" style="color: var(--danger);" data-toast="已删除">删除物品</button>
+            <button class="btn-secondary" style="color: var(--danger);" data-action="delete-item">删除物品</button>
             <p class="meta" style="text-align: center;">管理员与成员可编辑 · 访客只读</p>
           </section>
         </section>
@@ -2025,7 +2025,7 @@
   var ITEM_DETAILS = {
     '布洛芬缓释胶囊': { badge: 'danger', badgeText: '剩 6 天', meta: '药品 · 添加于 2025-03-12 · @m1', loc: '药箱 · 上层', qty: '2 盒', prod: '2025-03-12', exp: '2026-08-29', batch: '250312A', tags: '<span class="tag" style="margin-right: 6px;">常用</span><span class="tag">需冷藏?</span>', note: '饭后服用，开封后 6 个月内用完。备用药，注意别让小朋友拿到。' },
     '空气炸锅': { badge: 'warn', badgeText: '保修 9 月', meta: '家电 · 添加于 2026-01-18 · @m2', loc: '厨房 · 吊柜下层', qty: '1 件', prod: '—', exp: '—', batch: '—', tags: '<span class="tag" style="margin-right: 6px;">厨房</span><span class="tag">大件</span>', note: '保修至 2027 年 5 月，发票在证件盒。使用前记得取出说明书。' },
-    '蓝光眼镜': { badge: 'ok', badgeText: '正常', meta: '数码 3C · 添加于 2026-08-20 · @m3', loc: '书房 · 书桌抽屉', qty: '1 件', prod: '—', exp: '—', batch: '—', tags: '<span class="tag" style="margin-right: 6px;">常用</span>', note: '写作业用的，别借给别人。' },
+    '蓝光眼镜': { badge: 'ok', badgeText: '正常', meta: '数码 3C · 添加于 2026-08-20 · @m3', loc: '卧室 · 床头柜抽屉', qty: '1 件', prod: '—', exp: '—', batch: '—', tags: '<span class="tag" style="margin-right: 6px;">常用</span>', note: '写作业用的，别借给别人。' },
     '身份证扫描件': { badge: 'ok', badgeText: '正常', meta: '证件 · 添加于 2026-06-02 · @m1', loc: '玄关 · 证件盒', qty: '1 件', prod: '—', exp: '—', batch: '—', tags: '<span class="tag" style="margin-right: 6px;">重要</span>', note: '电子扫描件备份，纸质原件在户口本夹层。' },
     '维生素 C 泡腾片': { badge: 'warn', badgeText: '24 天', meta: '药品 · 添加于 2026-02-14 · @m2', loc: '客厅 · 茶几抽屉', qty: '1 支', prod: '2026-02-14', exp: '2026-09-16', batch: '260214B', tags: '<span class="tag" style="margin-right: 6px;">保健</span>', note: '每天一片，泡水喝。' },
     '电蚊香液（备用）': { badge: 'ok', badgeText: '正常', meta: '日用 · 添加于 2026-05-30 · @m1', loc: '储物间 · 收纳箱 B', qty: '3 瓶', prod: '—', exp: '—', batch: '—', tags: '<span class="tag" style="margin-right: 6px;">夏季</span>', note: '今年的用完再开新的。' },
@@ -2104,10 +2104,19 @@
     if (!oldCategory && old.meta) { oldCategory = (old.meta.split('·')[0] || '').trim(); }
     var cur = { name: newName, category: oldCategory || '物品', loc: loc, qty: qty, tags: tags, prod: prod, exp: exp, batch: batch, note: note, badge: old.badge || 'ok', badgeText: old.badgeText || '正常', added: (old.meta || '').replace(/^.*添加于\s*/, ''), member: (old.meta || '').match(/@(\w+)/) ? (old.meta.match(/@(\w+)/)[1]) : '1' };
     // 持久化到 localStorage（用户物品 + 演示物品都可编辑保存）
+    // 若改名（newName !== 旧名），先把旧名从数据源剔除，旧名加入删除清单，避免刷新后“旧名复活”
+    if (newName !== _viewingItem) {
+      var _arr = loadUserItems().filter(function (it) { return it && it.name !== _viewingItem; });
+      saveUserItems(_arr);
+      var _del = loadDeleted();
+      if (_del.indexOf(_viewingItem) < 0) _del.push(_viewingItem);
+      saveDeleted(_del);
+    }
     upsertUserItem(cur);
     mergeUserItemsIntoDetails();
     // 同步静态列表行，让回到列表也能看到改后的名称/位置/数量
     syncItemRow(_viewingItem, newName, loc, qty);
+    renderItemLists();
     _viewingItem = newName;
     fillDetail(newName);
     resetDetailEditMode();
@@ -2160,6 +2169,7 @@
       case 'edit-item':
         enterDetailEdit();
         break;
+      case 'delete-item':  deleteItem(_viewingItem); break;
       case 'save-item-edit':
         saveItemEdit();
         break;
@@ -2315,10 +2325,144 @@
       note: '', prod: '—', exp: '—', batch: '—'
     });
     mergeUserItemsIntoDetails();
-    prependItemRow(name, cat, savedLoc, qtyEl ? qtyEl.textContent.trim() : '1');
+    renderItemLists();
     toast('已加入物品库');
     setTimeout(goHome, 700);
   });
+
+  /* ── 物品列表统一渲染（数据驱动：localStorage 用户物品 + 演示物品） ── */
+  var DELETED_KEY = 'family-deleted-items';
+  function loadDeleted() { try { var v = localStorage.getItem(DELETED_KEY); return v ? JSON.parse(v) : []; } catch (e) {} return []; }
+  function saveDeleted(arr) { try { localStorage.setItem(DELETED_KEY, JSON.stringify(arr)); } catch (e) {} }
+  // 演示物品清单（仅用于首次渲染与“非用户数据”归类，用户可通过删除/编辑把它们降级为用户物品）
+  var DEMO_ITEMS = [
+    { name: '布洛芬缓释胶囊', badge: 'danger', badgeText: '6 天', meta: '药品 · 添加于 2025-03-12 · @m1', loc: '药箱 · 上层', qty: '2 盒', cat: '药品' },
+    { name: '空气炸锅', badge: 'warn', badgeText: '保修', meta: '家电 · 添加于 2026-01-18 · @m2', loc: '厨房 · 吊柜下层', qty: '1 件', cat: '家电' },
+    { name: '蓝光眼镜', badge: 'ok', badgeText: '正常', meta: '数码 3C · 添加于 2026-08-20 · @m3', loc: '卧室 · 床头柜抽屉', qty: '1 件', cat: '数码 3C' },
+    { name: '身份证扫描件', badge: 'ok', badgeText: '正常', meta: '证件 · 添加于 2026-06-02 · @m1', loc: '玄关 · 证件盒', qty: '1 件', cat: '证件' },
+    { name: '维生素 C 泡腾片', badge: 'warn', badgeText: '24 天', meta: '药品 · 添加于 2026-02-14 · @m2', loc: '客厅 · 茶几抽屉', qty: '1 支', cat: '药品' },
+    { name: '电蚊香液（备用）', badge: 'ok', badgeText: '正常', meta: '日用 · 添加于 2026-05-30 · @m1', loc: '储物间 · 收纳箱 B', qty: '3 瓶', cat: '日用' },
+    { name: '户口本', badge: 'ok', badgeText: '正常', meta: '证件 · 添加于 2026-03-11 · @m1', loc: '玄关 · 证件盒', qty: '1 本', cat: '证件' },
+    { name: '工具箱', badge: 'ok', badgeText: '正常', meta: '工具 · 添加于 2026-04-05 · @m1', loc: '储物间 · 工具架', qty: '1 套', cat: '工具' }
+  ];
+  function demoIcon(name) {
+    // 根据名称返回对应图标的 SVG path（尽量贴近原演示视觉）
+    if (/药|维生素/.test(name)) return '<svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="3"/><path d="M9 8h6M9 12h6M9 16h4"/></svg>';
+    if (/证件|身份证|户口/.test(name)) return '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M3 10h18"/></svg>';
+    if (/炸锅/.test(name)) return '<svg viewBox="0 0 24 24"><path d="M20 12v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8"/><path d="M22 7H2v5h20z"/><path d="M12 22V7"/></svg>';
+    if (/电蚊|蚊/.test(name)) return '<svg viewBox="0 0 24 24"><path d="M21 8l-9-5-9 5v8l9 5 9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/></svg>';
+    if (/户口|证/.test(name)) return '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M3 10h18"/></svg>';
+    if (/工具/.test(name)) return '<svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/><path d="M4 10h16M10 4v16"/></svg>';
+    if (/眼镜/.test(name)) return '<svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="3"/><path d="M9 8h6M9 12h6M9 16h4"/></svg>';
+    return '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>';
+  }
+  // 从 localStorage 用户物品 + 演示物品合并出一份有序列表（用户最新在前，演示在后）
+  function getAllItems() {
+    var deleted = loadDeleted();
+    var user = loadUserItems();
+    var seen = {};
+    var result = [];
+    user.forEach(function (it) { if (it && it.name) { if (seen[it.name]) return; seen[it.name] = 1; var cat = it.category || '物品'; result.push({ name: it.name, badge: it.badge || 'ok', badgeText: it.badgeText || '正常', meta: it.meta || (it.added ? cat + ' · 添加于 ' + it.added : ''), loc: it.loc || '未设置', qty: it.qty || '1', cat: cat }); } });
+    DEMO_ITEMS.forEach(function (d) { if (!seen[d.name] && deleted.indexOf(d.name) < 0) { result.push({ name: d.name, badge: d.badge, badgeText: d.badgeText, meta: d.meta, loc: d.loc, qty: d.qty, cat: d.cat }); } });
+    return result;
+  }
+  function buildItemRow(it) {
+    var row = document.createElement('div');
+    row.className = 'item-row';
+    row.setAttribute('data-action', 'go-detail');
+    row.setAttribute('data-item', it.name);
+    var icon = '<div class="item-thumb">' + demoIcon(it.name) + '</div>';
+    var sub = it.loc || '';
+    if (it.qty && it.qty !== '1') sub += ' · ' + it.qty;
+    if (!sub) sub = it.meta || '';
+    row.innerHTML = icon + '<div><div class="i-name"></div><div class="i-sub"></div></div><span class="badge ' + (it.badge || 'ok') + '"></span>';
+    row.querySelector('.i-name').textContent = it.name;
+    row.querySelector('.i-sub').textContent = sub;
+    row.querySelector('.badge').textContent = it.badgeText || '正常';
+    return row;
+  }
+  // 重建首页“最近添加”与“全部物品”列表（刷新后用户新增/编辑/删除均正确还原）
+  function renderItemLists() {    var items = getAllItems();
+    var listEl = document.getElementById('item-list');
+    if (listEl) { listEl.innerHTML = ''; items.forEach(function (it) { listEl.appendChild(buildItemRow(it)); }); }
+    var recentEl = document.getElementById('recent-list');
+    if (recentEl) {
+      // 保留“最近添加”标题行，仅重绘 item-row 区域
+      var oldRows = recentEl.querySelectorAll('.item-row');
+      oldRows.forEach(function (r) { r.remove(); });
+      var recents = items.slice(0, 3);
+      recents.forEach(function (it) { recentEl.appendChild(buildItemRow(it)); });
+    }
+    refreshItemStatsAll();
+  }
+  // 按物品数据刷新“全部物品”页总数与分类 tab（数据驱动，替代硬编码 42/9/7…）
+  function refreshItemStats() {
+    var items = getAllItems();
+    var totalEl = document.querySelector('[data-item-total]');
+    if (totalEl) totalEl.textContent = '共 ' + items.length + ' 件物品';
+    var tabs = document.querySelectorAll('[data-cat-tabs] [data-cat]');
+    var tabCats = {};
+    tabs.forEach(function (t) { var c = t.getAttribute('data-cat'); if (c && c !== 'all') tabCats[c] = true; });
+    var catCount = {};
+    items.forEach(function (it) {
+      var c = it.category || '其他';
+      if (!tabCats[c]) c = '其他'; // 未匹配 tab 的类别（数码 3C/日用/工具/物品 等）统一兜底到“其他”
+      catCount[c] = (catCount[c] || 0) + 1;
+    });
+    tabs.forEach(function (t) {
+      var c = t.getAttribute('data-cat');
+      if (c === 'all') { t.textContent = '全部 ' + items.length; }
+      else if (catCount[c] != null) { t.textContent = c + ' ' + catCount[c]; }
+      else { t.textContent = c; }
+    });
+  }
+  // 位置树计数（数据驱动：按物品 loc 首段聚合回填 .loc-count）+ 位置页 header
+  function refreshLocationCounts() {
+    var items = getAllItems();
+    var byRoom = {};
+    items.forEach(function (it) {
+      var room = (it.loc || '').split(' · ')[0].trim();
+      if (room) byRoom[room] = (byRoom[room] || 0) + 1;
+    });
+    document.querySelectorAll('#page-locations .loc-node').forEach(function (node) {
+      var nameEl = node.querySelector('.loc-head span');
+      var countEl = node.querySelector('.loc-count');
+      if (!nameEl || !countEl) return;
+      var name = nameEl.textContent.trim();
+      var n = byRoom[name] || 0;
+      countEl.textContent = n + ' 件';
+    });
+    var locHeader = document.querySelector('[data-loc-header]');
+    if (locHeader) {
+      var rooms = document.querySelectorAll('#page-locations .loc-node').length;
+      var spots = document.querySelectorAll('#page-locations .loc-child').length;
+      locHeader.textContent = rooms + ' 个房间 · ' + spots + ' 个收纳位';
+    }
+  }
+  // 刷新所有统计卡（物品页 + 位置页），在 init 与数据变更后调用
+  function refreshItemStatsAll() {
+    refreshItemStats();
+    refreshLocationCounts();
+  }
+  // 真删除：从 localStorage + ITEM_DETAILS + 列表 DOM + 演示记录一处移除
+  function deleteItem(name) {
+    if (!name) return;
+    if (!window.confirm('确定删除物品「' + name + '」吗？')) return;
+    // 从用户物品中删
+    var arr = loadUserItems();
+    arr = arr.filter(function (it) { return it && it.name !== name; });
+    saveUserItems(arr);
+    // 从 ITEM_DETAILS 中删
+    if (ITEM_DETAILS) { delete ITEM_DETAILS[name]; }
+    // 记录到删除列表，防止演示物品刷新后还原
+    var del = loadDeleted();
+    if (del.indexOf(name) < 0) del.push(name);
+    saveDeleted(del);
+    // 重建列表
+    renderItemLists();
+    toast('已删除');
+    goHome();
+  }
 
   function prependItemRow(name, cat, loc, qty) {
     var listEl = document.getElementById('item-list');
@@ -2400,7 +2544,7 @@
       note: '效期：' + (exp || '不限'), prod: prod, exp: exp, batch: batch
     });
     mergeUserItemsIntoDetails();
-    prependItemRow(name, '药品', loc, '');
+    renderItemLists();
     toast('已加入药品库并挂提醒');
     setTimeout(goHome, 700);
   });
@@ -2442,6 +2586,8 @@
   }
   ensureLocSelects();
   restoreLocations();
+  renderItemLists();
+  refreshItemStatsAll();
   renderMembers();
   renderFamily();
   renderSelfCard();
