@@ -862,6 +862,13 @@
               </span>
               <span class="meta">刚刚同步</span>
             </div>
+            <div class="card flat row-between" style="cursor: pointer;" id="install-app-row" data-action="install-app">
+              <span style="display: flex; align-items: center; gap: 10px;">
+                <svg viewBox="0 0 24 24" style="width: 19px; height: 19px; stroke: var(--muted); fill: none; stroke-width: 1.7;"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M4 19h16"/></svg>
+                添加到手机桌面
+              </span>
+              <span class="meta" id="install-app-meta">›</span>
+            </div>
             <div class="card flat row-between">
               <span style="display: flex; align-items: center; gap: 10px;">
                 <svg viewBox="0 0 24 24" style="width: 19px; height: 19px; stroke: var(--muted); fill: none; stroke-width: 1.7;"><path d="M12 3l8 4v5c0 4.5-3.2 7.8-8 9-4.8-1.2-8-4.5-8-9V7z"/><path d="M9.5 12l2 2 3.5-4"/></svg>
@@ -2166,6 +2173,8 @@
     toastEl.classList.add('show');
     clearTimeout(toastTimer);
     toastTimer = setTimeout(function () { toastEl.classList.remove('show'); }, 1800);
+    // 暴露到全局，供 PWA 强化 IIFE 等其它作用域复用
+    window.toast = toast;
   }
 
   /* ── global click routing ── */
@@ -2754,6 +2763,37 @@
       isStandalone = true;
       if (installCard) installCard.style.display = 'none';
     });
+
+    // 4)“我的”页里的“添加到手机桌面”设置项：复用同一套安装引导逻辑
+    var installAppRow = document.getElementById('install-app-row');
+    var installAppMeta = document.getElementById('install-app-meta');
+    function refreshInstallAppRow() {
+      if (!installAppMeta) return;
+      if (isStandalone) { installAppMeta.textContent = '已添加 ✓'; }
+      else { installAppMeta.textContent = '›'; }
+    }
+    refreshInstallAppRow();
+    window.addEventListener('appinstalled', refreshInstallAppRow);
+    if (installAppRow) {
+      installAppRow.addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        if (isStandalone) { toast('已添加到手机桌面'); return; }
+        if (deferredPrompt) {
+          // 浏览器给了原生安装信号：直接触发系统安装
+          deferredPrompt.prompt();
+          deferredPrompt.userChoice.then(function () {
+            deferredPrompt = null;
+            refreshInstallAppRow();
+            // 同步隐藏主页安装卡片，避免 prompt 后残留“加入桌面”
+            if (installCard) installCard.style.display = 'none';
+          });
+        } else if (isIOS) {
+          toast('点击底部分享按钮，选择“添加到主屏幕”');
+        } else {
+          toast('点右上角菜单里的“添加到主屏幕”，或“安装应用”');
+        }
+      });
+    }
   })();
 </script>
 </body>
