@@ -2173,9 +2173,9 @@
     toastEl.classList.add('show');
     clearTimeout(toastTimer);
     toastTimer = setTimeout(function () { toastEl.classList.remove('show'); }, 1800);
-    // 暴露到全局，供 PWA 强化 IIFE 等其它作用域复用
-    window.toast = toast;
   }
+  // 暴露到全局，供 PWA 强化 IIFE 等其它作用域复用（必须在函数体外，页面加载即生效，否则未调用过 toast 时不可见）
+  window.toast = toast;
 
   /* ── global click routing ── */
   document.addEventListener('click', function (e) {
@@ -2789,6 +2789,11 @@
           });
         } else if (isIOS) {
           toast('点击底部分享按钮，选择“添加到主屏幕”');
+        } else if (location.protocol !== 'https:') {
+          // 本地 file:// 或非 HTTPS：浏览器不会给 PWA 安装信号，点了也不会生成图标
+          toast('需通过 HTTPS 部署后，浏览器才会提供“安装/添加到主屏幕”');
+        } else if (!('serviceWorker' in navigator) || !navigator.serviceWorker.controller) {
+          toast('请刷新一次让服务就绪，再点“添加到桌面”；若仍无提示，请从浏览器菜单选“安装应用”');
         } else {
           toast('点右上角菜单里的“添加到主屏幕”，或“安装应用”');
         }
