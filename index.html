@@ -197,6 +197,9 @@
     background: var(--accent-soft); color: var(--accent-deep); border-radius: 999px;
     font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase;
   }
+  .empty-hint {
+    text-align: center; padding: 28px 0; color: var(--muted); font-size: 13px;
+  }
   .tag {
     display: inline-flex; align-items: center; padding: 5px 12px; min-height: 28px;
     background: transparent; color: var(--muted); border: 1px solid var(--border);
@@ -584,6 +587,7 @@
               <span class="tag" data-cat="家电">家电</span>
               <span class="tag" data-cat="证件">证件</span>
               <span class="tag" data-cat="衣物">衣物</span>
+              <span class="tag" data-cat="书籍">书籍</span>
               <span class="tag" data-cat="其他">其他</span>
             </div>
           </section>
@@ -1013,6 +1017,7 @@
                 <span class="tag active">数码 3C</span>
                 <span class="tag">药品</span>
                 <span class="tag">食品</span>
+                <span class="tag">书籍</span>
                 <span class="tag">其他</span>
               </div>
             </div>
@@ -1174,7 +1179,7 @@
           </div>
 
           <section class="pad" style="padding-top: 4px;">
-            <div class="ph-img wide" style="aspect-ratio: 16/10; border-radius: 18px;"></div>
+            <div class="ph-img wide" id="dt-photo" style="aspect-ratio: 16/10; border-radius: 18px;"></div>
           </section>
 
           <section class="pad" style="padding-top: 16px;">
@@ -1783,7 +1788,7 @@
           badge: it.badge || 'ok', badgeText: it.badgeText || '正常',
           meta: (it.category || '物品') + ' · 添加于 ' + (it.added || '') + (it.member ? ' · @' + it.member : ''),
           loc: it.loc || '未设置', qty: it.qty || '1', prod: it.prod || '—', exp: it.exp || '—', batch: it.batch || '—',
-          tags: it.tags || '', note: it.note || ''
+          tags: it.tags || '', note: it.note || '', photo: it.photo || ''
         };
       }
     });
@@ -2443,6 +2448,19 @@
     document.getElementById('dt-batch').textContent = d.batch;
     document.getElementById('dt-tags').innerHTML = d.tags;
     document.getElementById('dt-note').textContent = d.note;
+    // 拍照添加的物品回显照片（无则保留占位）
+    var ph = document.getElementById('dt-photo');
+    if (ph) {
+      if (d.photo) {
+        ph.style.backgroundImage = 'url(' + d.photo + ')';
+        ph.style.backgroundSize = 'cover';
+        ph.style.backgroundPosition = 'center';
+        ph.style.color = 'transparent';
+      } else {
+        ph.style.backgroundImage = '';
+        ph.style.color = '';
+      }
+    }
   }
 
   /* ── 物品编辑态 ── */
@@ -2498,7 +2516,7 @@
     // 从 meta（如“药品 · 添加于 … @m1”）提取分类；无 category 字段时回退提取 meta 首段
     var oldCategory = old.category;
     if (!oldCategory && old.meta) { oldCategory = (old.meta.split('·')[0] || '').trim(); }
-    var cur = { name: newName, category: oldCategory || '物品', loc: loc, qty: qty, tags: tags, prod: prod, exp: exp, batch: batch, note: note, badge: old.badge || 'ok', badgeText: old.badgeText || '正常', added: (old.meta || '').replace(/^.*添加于\s*/, ''), member: (old.meta || '').match(/@(\w+)/) ? (old.meta.match(/@(\w+)/)[1]) : '1' };
+    var cur = { name: newName, category: oldCategory || '物品', loc: loc, qty: qty, tags: tags, prod: prod, exp: exp, batch: batch, note: note, badge: old.badge || 'ok', badgeText: old.badgeText || '正常', added: (old.meta || '').replace(/^.*添加于\s*/, ''), member: (old.meta || '').match(/@(\w+)/) ? (old.meta.match(/@(\w+)/)[1]) : '1', photo: old.photo || '' };
     // 持久化到 localStorage（用户物品 + 演示物品都可编辑保存）
     // 若改名（newName !== 旧名），先把旧名从数据源剔除，旧名加入删除清单，避免刷新后“旧名复活”
     if (newName !== _viewingItem) {
@@ -2587,11 +2605,11 @@
         renderLocParentOptions('');
         showPage('page-add-location'); break;
       case 'create-location': addNewLocation(); break;
-      case 'go-scan':        inFlow = true; showPage('page-scan'); startCamera(); break;
+      case 'go-scan':        inFlow = true; window.__lastShotDataURL = ''; showPage('page-scan'); startCamera(); break;
       case 'go-scan-error':  inFlow = true; showPage('page-scan-error'); break;
       case 'go-scanning':    inFlow = true; showPage('page-scanning'); break;
       case 'go-scan-confirm': inFlow = true; showPage('page-scan-confirm'); break;
-      case 'go-medicine':    inFlow = true; showPage('page-medicine'); startCamera(); break;
+      case 'go-medicine':    inFlow = true; window.__lastShotDataURL = ''; showPage('page-medicine'); startCamera(); break;
       case 'go-medicine-error': inFlow = true; showPage('page-medicine-error'); break;
       case 'go-medicine-scanning': inFlow = true; showPage('page-medicine-scanning'); break;
       case 'go-medicine-confirm': inFlow = true; showPage('page-medicine-confirm'); break;
@@ -2656,11 +2674,16 @@
   function grabFrame() {
     ensureCamEls();
     if (!camVideo || !camVideo.videoWidth) return null;
+    var vw = camVideo.videoWidth, vh = camVideo.videoHeight;
+    // 存储端压缩：限制最长边，避免 localStorage 被大图占满
+    var maxW = 1000;
+    var scale = vw > maxW ? (maxW / vw) : 1;
+    var cw = Math.round(vw * scale), ch = Math.round(vh * scale);
     var canvas = document.createElement('canvas');
-    canvas.width  = camVideo.videoWidth;
-    canvas.height = camVideo.videoHeight;
-    canvas.getContext('2d').drawImage(camVideo, 0, 0, canvas.width, canvas.height);
-    return canvas.toDataURL('image/jpeg', 0.92);
+    canvas.width  = cw;
+    canvas.height = ch;
+    canvas.getContext('2d').drawImage(camVideo, 0, 0, cw, ch);
+    return canvas.toDataURL('image/jpeg', 0.8);
   }
   // 离开页面/切后台时释放摄像头，避免占用与白屏
   window.addEventListener('pagehide', stopCamera);
@@ -2727,7 +2750,7 @@
       qty: qtyEl ? qtyEl.textContent.trim() : '1',
       tags: tagEl ? tagEl.textContent.trim() : '',
       badge: 'ok', badgeText: '正常', added: dstr, member: '1',
-      note: '', prod: '—', exp: '—', batch: '—'
+      note: '', prod: '—', exp: '—', batch: '—', photo: window.__lastShotDataURL || ''
     });
     mergeUserItemsIntoDetails();
     renderItemLists();
@@ -2787,10 +2810,28 @@
     row.querySelector('.badge').textContent = it.badgeText || '正常';
     return row;
   }
+  // 类别归一化：未列出的类别（数码 3C/日用/工具/物品 等）统一归到“其他”，与统计/过滤口径一致
+  var CAT_TABS = ['药品', '食品', '家电', '证件', '衣物', '书籍', '其他'];
+  function normalizeCat(c) {
+    return (c && CAT_TABS.indexOf(c) >= 0) ? c : '其他';
+  }
   // 重建首页“最近添加”与“全部物品”列表（刷新后用户新增/编辑/删除均正确还原）
   function renderItemLists() {    var items = getAllItems();
     var listEl = document.getElementById('item-list');
-    if (listEl) { listEl.innerHTML = ''; items.forEach(function (it) { listEl.appendChild(buildItemRow(it)); }); }
+    if (listEl) {
+      listEl.innerHTML = '';
+      var catFilter = window._catFilter || 'all';
+      var shown = items;
+      if (catFilter && catFilter !== 'all') shown = items.filter(function (it) { return normalizeCat(it.cat || it.category) === catFilter; });
+      if (!shown.length) {
+        var empty = document.createElement('div');
+        empty.className = 'empty-hint';
+        empty.textContent = '该类别暂无物品';
+        listEl.appendChild(empty);
+      } else {
+        shown.forEach(function (it) { listEl.appendChild(buildItemRow(it)); });
+      }
+    }
     var recentEl = document.getElementById('recent-list');
     if (recentEl) {
       // 保留“最近添加”标题行，仅重绘 item-row 区域
@@ -2807,12 +2848,9 @@
     var totalEl = document.querySelector('[data-item-total]');
     if (totalEl) totalEl.textContent = '共 ' + items.length + ' 件物品';
     var tabs = document.querySelectorAll('[data-cat-tabs] [data-cat]');
-    var tabCats = {};
-    tabs.forEach(function (t) { var c = t.getAttribute('data-cat'); if (c && c !== 'all') tabCats[c] = true; });
     var catCount = {};
     items.forEach(function (it) {
-      var c = it.category || '其他';
-      if (!tabCats[c]) c = '其他'; // 未匹配 tab 的类别（数码 3C/日用/工具/物品 等）统一兜底到“其他”
+      var c = normalizeCat(it.category || '其他');
       catCount[c] = (catCount[c] || 0) + 1;
     });
     tabs.forEach(function (t) {
@@ -2856,6 +2894,21 @@
       locHeader.textContent = rooms + ' 个房间 · ' + spots + ' 个收纳位';
     }
   }
+  // 类别 tab 点击 → 切换高亮 + 按类别过滤“全部物品”列表（委托，动态 tab 也生效）
+  function bindCatTabs() {
+    var wrap = document.querySelector('[data-cat-tabs]');
+    if (!wrap) return;
+    wrap.addEventListener('click', function (e) {
+      var t = e.target.closest('.tag[data-cat]');
+      if (!t) return;
+      var cat = t.getAttribute('data-cat');
+      window._catFilter = cat || 'all';
+      wrap.querySelectorAll('.tag').forEach(function (x) { x.classList.remove('active'); });
+      t.classList.add('active');
+      renderItemLists();
+    });
+  }
+  bindCatTabs();
   // 刷新所有统计卡（物品页 + 位置页），在 init 与数据变更后调用
   function refreshItemStatsAll() {
     refreshItemStats();
@@ -3073,7 +3126,7 @@
       name: name, category: '药品',
       loc: loc, qty: '1', tags: '<span class="tag" style="margin-right: 6px;">常用</span>',
       badge: badge, badgeText: badgeText, added: dstr, member: '1',
-      note: '效期：' + (exp || '不限'), prod: prod, exp: exp, batch: batch
+      note: '效期：' + (exp || '不限'), prod: prod, exp: exp, batch: batch, photo: window.__lastShotDataURL || ''
     });
     mergeUserItemsIntoDetails();
     renderItemLists();
