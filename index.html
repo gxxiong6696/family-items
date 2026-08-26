@@ -2021,6 +2021,11 @@
     var sep = label.indexOf(' · ');
     return sep > 0 ? label.slice(sep + 3) : label;
   }
+  // 是否为“自定义位置”（存在于 LOCATIONS_KEY）：用于区分内置位置的持久化路径
+  function isCustomLoc(label) {
+    var arr = loadLocations();
+    return arr.some(function (it) { if (!it) return false; return ((it.parent ? it.parent + ' · ' + it.name : it.name) === label); });
+  }
   // 某位置（房间或收纳位）及其子位下的物品数：用于“空位置才可删/改”守卫
   function countItemsAt(label) {
     if (!label) return 0;
@@ -2079,20 +2084,21 @@
     while (map[name] && guard < 100) { name = map[name]; guard++; }
     return name;
   }
-  // 判断某标签是否为“当前有效”的内置房间（含已改名后的新名）
-  function isEffectiveRoom(label) {
-    if (isBuiltinRoom(label)) return true;
-    var map = loadLocRenamed();
-    for (var k in map) { if (map[k] === label) return true; }
-    return false;
-  }
-  // 页面加载时应用内置房间改名（跨刷新保持，先改名后删除，保证删除匹配当前名）
+  // 页面加载时应用内置位置改名（房间 + 二级收纳位），跨刷新保持
   function applyLocRenames() {
     document.querySelectorAll('#page-locations .loc-node').forEach(function (node) {
       var headEl = node.querySelector('.loc-head');
       var spanEl = headEl ? headEl.querySelector('span') : null;
       if (!spanEl) return;
-      spanEl.textContent = resolveRenamedName(spanEl.textContent.trim());
+      var roomName = resolveRenamedName(spanEl.textContent.trim());
+      spanEl.textContent = roomName;
+      node.querySelectorAll('.loc-child span').forEach(function (sp) {
+        var slotName = sp.textContent.trim();
+        var full = roomName ? (roomName + ' · ' + slotName) : slotName;
+        var resolved = resolveRenamedName(full);
+        var sep = resolved.indexOf(' · ');
+        sp.textContent = sep > 0 ? resolved.slice(sep + 3) : resolved;
+      });
     });
   }
 
@@ -2209,8 +2215,7 @@
   }
 
   /* ── 位置编辑：改名已有自定义位置（复用新增 sheet，只对自定义位置开放） ── */
-  // 打开编辑 sheet：预填旧名，标题与按钮切换为编辑态
-  // 打开编辑 sheet：预填信息。支持自定义位置（全名/单名匹配）与内置房间（空时允许改名）
+  // 打开编辑 sheet：预填信息。支持自定义位置（全名/单名匹配）与内置位置（房间或收纳位改名，级联更新物品）
   function openLocEdit(entry) {
     if (!entry) return;
     var arr = loadLocations();
@@ -2220,12 +2225,11 @@
       var full = it.parent ? (it.parent + ' · ' + it.name) : it.name;
       if (full === entry || it.name === entry) { found = it; foundFull = full; break; }
     }
-    var builtinRoom = !found && isEffectiveRoom(entry);
-    if (!found && !builtinRoom) { toast('未找到该位置'); return; }
-    // 内置房间只有空时才允许改名，避免破坏含物品位置的数据关联
-    if (builtinRoom && countItemsAt(entry) > 0) { toast('该位置下还有物品，请先清空或移走'); return; }
+    // 未命中自定义位置时，接受内置位置（房间或收纳位）
+    if (!found && !isBuiltinLoc(entry)) { toast('未找到该位置'); return; }
+    // 内置房间/收纳位均支持改名（改名会级联更新物品，无需清空）
     window._editingLocOld = foundFull || entry;   // 用全名做级联与持久化
-    window._editingLocIsRoom = found ? !found.parent : builtinRoom;
+    window._editingLocIsRoom = found ? !found.parent : isBuiltinRoom(entry);
     var title = document.getElementById('loc-edit-title');
     if (title) title.textContent = '编辑存放位置';
     var btn = document.getElementById('create-location-btn');
@@ -2235,6 +2239,7 @@
     var noteEl = document.getElementById('loc-note');
     if (noteEl) noteEl.textContent = found ? (found.note || '') : '';
     var parentLabel = found ? (found.parent || '') : '';
+    if (!found) { var ps = entry.indexOf(' · '); if (ps > 0) parentLabel = entry.slice(0, ps); }
     // 上级位置选中：若为房间，默认选「无（作为房间）」
     document.querySelectorAll('#page-add-location .tag').forEach(function (t) {
       var on = (!parentLabel) ? (t.textContent.trim() === '无（作为房间）') : (t.textContent.trim() === parentLabel);
@@ -2261,7 +2266,8 @@
     var arr = loadLocations();
     // 重名检查：自定义位置全名互斥 + （房间时）与内置/已改名房间互斥
     var dup = arr.some(function (it) { if (!it) return false; var full = it.parent ? (it.parent + ' · ' + it.name) : it.name; return full === newFull && full !== oldName; });
-    if (!dup && isRoom) dup = isEffectiveRoom(newFull);
+    // 内置位置（房间/收纳位）改名时，与其它内置位置互斥
+    if (!dup && !isCustomLoc(oldName) && isBuiltinLoc(newFull) && newFull !== oldName) dup = true;
     if (dup) { toast('已存在同名位置'); return; }
     // 更新自定义位置数据：name + 作为 parent 的子位置引用
     var changed = false;
@@ -2272,11 +2278,19 @@
       if (it.parent === oldName) { it.parent = newName; changed = true; }
     });
     if (changed) saveLocations(arr);
-    // 内置房间改名：持久化（旧名 -> 新名），跨刷新保持
-    if (isRoom && isEffectiveRoom(oldName)) {
+    // 内置位置（房间或收纳位）改名：持久化（旧全名 -> 新全名），跨刷新保持
+    if (!isCustomLoc(oldName)) {
       var rmap = loadLocRenamed();
-      rmap[oldName] = newName;
-      saveLocRenamed(rmap);
+      rmap[oldName] = newFull;
+      // 若改的是房间，把该房间下子位的改名条目从旧房间名前缀改写为新房间名
+      var rewritten = {};
+      Object.keys(rmap).forEach(function (k) {
+        var v = rmap[k];
+        var kk = (k.indexOf(oldName + ' · ') === 0) ? (newFull + k.slice(oldName.length)) : k;
+        var vv = (v.indexOf(oldName + ' · ') === 0) ? (newFull + v.slice(oldName.length)) : v;
+        rewritten[kk] = vv;
+      });
+      saveLocRenamed(rewritten);
     }
     // 级联更新引用旧位置名的物品 loc（含 ITEM_DETAILS 与用户物品）
     Object.keys(ITEM_DETAILS).forEach(function (key) {
@@ -2339,8 +2353,8 @@
         var cName = subEl ? subEl.textContent.trim() : '';
         if (!cName) return;
         var full = roomName ? (roomName + ' · ' + cName) : cName;
-        // 编辑用单名（自定义位置改名走单名匹配）；删除用全名（精准定位并持久化）
-        if (!child.querySelector('.loc-edit-btn')) child.appendChild(locBtn('edit-location', 'loc-edit-btn', cName, '编辑位置名', LOC_EDIT_SVG));
+        // 编辑与删除均用“全名”定位，确保二级位置（含内置）也能正确解析
+        if (!child.querySelector('.loc-edit-btn')) child.appendChild(locBtn('edit-location', 'loc-edit-btn', full, '编辑位置名', LOC_EDIT_SVG));
         if (!child.querySelector('.loc-del-btn')) child.appendChild(locBtn('delete-location', 'loc-del-btn', full, '删除位置', LOC_DEL_SVG));
       });
     });
