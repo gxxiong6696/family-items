@@ -2026,6 +2026,22 @@
     var arr = loadLocations();
     return arr.some(function (it) { if (!it) return false; return ((it.parent ? it.parent + ' · ' + it.name : it.name) === label); });
   }
+  // 按当前渲染的位置树节点识别位置（房间=头，收纳位=子位）；支持改名/自定义后的当前名
+  function findLocNode(label) {
+    var hit = null;
+    document.querySelectorAll('#page-locations .loc-node').forEach(function (node) {
+      var headEl = node.querySelector('.loc-head');
+      var nameEl = headEl ? headEl.querySelector('span') : null;
+      var roomName = nameEl ? nameEl.textContent.trim() : '';
+      if (!hit && roomName === label) { hit = { node: node, isRoom: true }; return; }
+      node.querySelectorAll('.loc-child').forEach(function (child) {
+        var cNameEl = child.querySelector('span');
+        var cName = cNameEl ? cNameEl.textContent.trim() : '';
+        if (!hit && roomName && (roomName + ' · ' + cName) === label) hit = { node: child, isRoom: false };
+      });
+    });
+    return hit;
+  }
   // 某位置（房间或收纳位）及其子位下的物品数：用于“空位置才可删/改”守卫
   function countItemsAt(label) {
     if (!label) return 0;
@@ -2225,11 +2241,15 @@
       var full = it.parent ? (it.parent + ' · ' + it.name) : it.name;
       if (full === entry || it.name === entry) { found = it; foundFull = full; break; }
     }
-    // 未命中自定义位置时，接受内置位置（房间或收纳位）
-    if (!found && !isBuiltinLoc(entry)) { toast('未找到该位置'); return; }
-    // 内置房间/收纳位均支持改名（改名会级联更新物品，无需清空）
+    // 未命中自定义位置时，按当前渲染的位置树识别（覆盖内置 + 改名后的内置）；识别不到才提示
+    var builtinInfo = null;
+    if (!found) {
+      builtinInfo = findLocNode(entry);
+      if (!builtinInfo) { toast('未找到该位置'); return; }
+    }
+    // 内置/自定义位置均支持改名（改名会级联更新物品，无需清空）
     window._editingLocOld = foundFull || entry;   // 用全名做级联与持久化
-    window._editingLocIsRoom = found ? !found.parent : isBuiltinRoom(entry);
+    window._editingLocIsRoom = found ? !found.parent : !!builtinInfo.isRoom;
     var title = document.getElementById('loc-edit-title');
     if (title) title.textContent = '编辑存放位置';
     var btn = document.getElementById('create-location-btn');
