@@ -1014,11 +1014,13 @@
             <div class="field">
               <label>分类</label>
               <div class="row" style="gap: 8px; flex-wrap: wrap;">
-                <span class="tag active">数码 3C</span>
                 <span class="tag">药品</span>
                 <span class="tag">食品</span>
+                <span class="tag">家电</span>
+                <span class="tag">证件</span>
+                <span class="tag">衣物</span>
                 <span class="tag">书籍</span>
-                <span class="tag">其他</span>
+                <span class="tag active">其他</span>
               </div>
             </div>
 
@@ -1924,6 +1926,16 @@
     for (var k in LABEL_NAME_CN) { if (label.indexOf(k) >= 0) return LABEL_NAME_CN[k]; }
     return '';
   }
+  // 识别英文标签 → 中文分类（与“全部物品”页 7 类对齐；未命中归为“其他”）
+  var RECOG_MAP = {
+    'pill': '药品', 'medicine': '药品', 'syringe': '药品', 'stethoscope': '药品', 'band-aid': '药品', 'drug': '药品', 'bottle': '药品', 'perfume': '药品', 'lotion': '药品', 'soap dispenser': '药品', 'toothbrush': '药品', 'hair spray': '药品', 'medical': '药品', 'drugstore': '药品', 'medicine chest': '药品', 'pill bottle': '药品', 'first aid': '药品',
+    'book': '书籍', 'bookcase': '书籍', 'bookshelf': '书籍', 'comic book': '书籍', 'comic': '书籍', 'notebook': '书籍', 'library': '书籍', 'book jacket': '书籍', 'file': '书籍', 'folder': '书籍', 'envelope': '书籍', 'menu': '书籍', 'briefcase': '书籍', 'desk': '书籍', 'paperback': '书籍', 'magazine': '书籍',
+    'refrigerator': '家电', 'microwave': '家电', 'oven': '家电', 'coffee maker': '家电', 'toaster': '家电', 'dishwasher': '家电', 'washer': '家电', 'washing machine': '家电', 'vacuum': '家电', 'iron': '家电', 'electric fan': '家电', 'space heater': '家电', 'television': '家电', 'monitor': '家电', 'radio': '家电', 'laptop': '家电', 'computer keyboard': '家电', 'mouse': '家电', 'cellular telephone': '家电', 'mobile phone': '家电', 'camera': '家电', 'pendrive': '家电', 'headphone': '家电', 'earphone': '家电', 'ipod': '家电', 'remote control': '家电', 'digital watch': '家电', 'computer': '家电', 'device': '家电', 'tablet': '家电',
+    'passport': '证件', 'id card': '证件', 'credit card': '证件', 'banknote': '证件', 'cardboard': '证件', 'document': '证件', 'handbook': '证件', 'diploma': '证件',
+    'shirt': '衣物', 'dress': '衣物', 'coat': '衣物', 'hoodie': '衣物', 'sweater': '衣物', 'suit': '衣物', 'trousers': '衣物', 'jacket': '衣物', 'sandal': '衣物', 'wardrobe': '衣物', 'jersey': '衣物', 'skirt': '衣物', 'put on': '衣物', 'sock': '衣物', 'shoe': '衣物',
+    'food': '食品', 'soup bowl': '食品', 'wok': '食品', 'frying pan': '食品', 'plate': '食品', 'cup': '食品', 'mug': '食品', 'water bottle': '食品', 'pizza': '食品', 'bagel': '食品', 'pancake': '食品', 'hotdog': '食品', 'banana': '食品', 'apple': '食品', 'ice cream': '食品', 'sandwich': '食品', 'mushroom': '食品', 'bread': '食品', 'rice': '食品', 'dairy': '食品', 'saucepan': '食品', 'skillet': '食品',
+    'carton': '其他', 'box': '其他', 'bag': '其他', 'basket': '其他', 'pot': '其他', 'vase': '其他', 'tray': '其他', 'bucket': '其他', 'table': '其他', 'chair': '其他', 'table lamp': '其他', 'lampshade': '其他', 'doormat': '其他', 'home': '其他'
+  };
   function recognizeItem(dataUrl, cb) {
     // 优先客户端模型；失败回退到 null，调用方降级手动
     if (!_mobilenet) { if (cb) cb(null); return; }
