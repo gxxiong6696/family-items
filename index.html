@@ -2183,6 +2183,46 @@
   }
 
   // 核心：新增一条位置 → 保存到本地 + 追加到树
+  // 运行时填充“新增/编辑位置”面板里的可选上级位置（顶级房间）：内置(当前名)+自定义，排除已删除；单选取代委托到 row
+  function renderLocParentOptions(activeLabel) {
+    var row = document.querySelector('#page-add-location .field .row');
+    if (!row) return;
+    var deleted = loadDeletedLocs();
+    var names = [];
+    function pushName(n) {
+      var v = (n || '').trim();
+      if (v && names.indexOf(v) < 0) names.push(v);
+    }
+    // 内置房间：取改名后的当前名；已删除的不展示
+    BUILTIN_ROOMS.forEach(function (r) {
+      var cur = resolveRenamedName(r.name);
+      var wasDeleted = deleted.indexOf(r.name) >= 0 || deleted.indexOf(cur) >= 0;
+      if (!wasDeleted) pushName(cur);
+    });
+    // 自定义顶级房间（LOCATIONS_KEY 中 parent 为空）
+    loadLocations().forEach(function (it) {
+      if (it && it.name && !it.parent) pushName(resolveRenamedName(it.name));
+    });
+    row.innerHTML = '';
+    function addTag(text, active) {
+      var s = document.createElement('span');
+      s.className = 'tag' + (active ? ' active' : '');
+      s.textContent = text;
+      row.appendChild(s);
+    }
+    addTag('无（作为房间）', !activeLabel || activeLabel === '无（作为房间）');
+    names.forEach(function (n) { addTag(n, n === activeLabel); });
+    if (!row.__tagBound) {
+      row.__tagBound = true;
+      row.addEventListener('click', function (e) {
+        var t = e.target.closest('.tag');
+        if (!t || !row.contains(t)) return;
+        row.querySelectorAll('.tag').forEach(function (x) { x.classList.remove('active'); });
+        t.classList.add('active');
+      });
+    }
+  }
+
   function addNewLocation() {
     var nameEl = document.getElementById('loc-name');
     var noteEl = document.getElementById('loc-note');
@@ -2260,11 +2300,8 @@
     if (noteEl) noteEl.textContent = found ? (found.note || '') : '';
     var parentLabel = found ? (found.parent || '') : '';
     if (!found) { var ps = entry.indexOf(' · '); if (ps > 0) parentLabel = entry.slice(0, ps); }
-    // 上级位置选中：若为房间，默认选「无（作为房间）」
-    document.querySelectorAll('#page-add-location .tag').forEach(function (t) {
-      var on = (!parentLabel) ? (t.textContent.trim() === '无（作为房间）') : (t.textContent.trim() === parentLabel);
-      t.classList.toggle('active', on);
-    });
+    // 上级位置：运行时填充（含自定义/改名后的顶级房间），并按当前上级选中
+    renderLocParentOptions(parentLabel);
     inFlow = false;
     showPage('page-add-location');
   }
@@ -2547,6 +2584,7 @@
       case 'go-add-location': window._editingLocOld = null; window._editingLocIsRoom = null;
         var _lhtitle = document.getElementById('loc-edit-title'); if (_lhtitle) _lhtitle.textContent = '新增存放位置';
         var _lhbtn = document.getElementById('create-location-btn'); if (_lhbtn) _lhbtn.textContent = '创建位置';
+        renderLocParentOptions('');
         showPage('page-add-location'); break;
       case 'create-location': addNewLocation(); break;
       case 'go-scan':        inFlow = true; showPage('page-scan'); startCamera(); break;
