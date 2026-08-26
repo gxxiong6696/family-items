@@ -1241,6 +1241,18 @@
               <div class="input editable" id="ed-name" contenteditable="true" role="textbox"></div>
             </div>
             <div class="field">
+              <label for="ed-cat">分类</label>
+              <select class="input editable" id="ed-cat">
+                <option value="药品">药品</option>
+                <option value="食品">食品</option>
+                <option value="家电">家电</option>
+                <option value="证件">证件</option>
+                <option value="衣物">衣物</option>
+                <option value="书籍">书籍</option>
+                <option value="其他">其他</option>
+              </select>
+            </div>
+            <div class="field">
               <label for="ed-loc">存放位置</label>
               <select class="input editable" id="ed-loc"></select>
             </div>
@@ -2486,18 +2498,36 @@
   function renderDatePick() {
     var el = document.getElementById('date-pick-list');
     if (!el) return;
-    var names = [];
-    Object.keys(ITEM_DETAILS).forEach(function (n) { var d = ITEM_DETAILS[n]; if (d && itemHasDate(d)) names.push(n); });
-    if (!names.length) {
+    var groups = {};
+    Object.keys(ITEM_DETAILS).forEach(function (n) {
+      var d = ITEM_DETAILS[n];
+      if (d && itemHasDate(d)) {
+        var cat = itemCategory(d) || '药品';
+        (groups[cat] = groups[cat] || []).push(n);
+      }
+    });
+    var hasItems = Object.keys(groups).length > 0;
+    if (!hasItems) {
       el.innerHTML = '<div class="empty-state"><div class="empty-icon"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg></div><h3>暂无带日期的物品</h3><p>先在「拍照添加」里添加带生产日期/有效期的物品</p></div>';
       return;
     }
     var cal = '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>';
-    el.innerHTML = names.map(function (n) {
-      var d = ITEM_DETAILS[n]; var cat = itemCategory(d);
-      var sub = cat + (d.exp ? ' · 有效期 ' + d.exp : ' · 无有效期');
-      return '<div class="item-row" data-action="go-date-pick-item" data-item="' + n + '"><div class="item-thumb">' + cal + '</div><div><div class="i-name">' + n + '</div><div class="i-sub">' + sub + '</div></div></div>';
+    var header = function (cat, count) {
+      return '<div style="margin:16px 2px 8px;display:flex;align-items:center;gap:8px;"><span style="font-weight:600;font-size:14px;">' + cat + '</span><span style="font-size:12px;color:var(--muted);">' + count + ' 件</span><span style="flex:1;height:1px;background:var(--border);"></span></div>';
+    };
+    var order = CAT_TABS.filter(function (c) { return groups[c]; });
+    Object.keys(groups).forEach(function (c) { if (CAT_TABS.indexOf(c) < 0 && order.indexOf(c) < 0) order.push(c); });
+    var html = order.map(function (cat) {
+      var items = groups[cat];
+      return header(cat, items.length) + items.map(function (n) {
+        var d = ITEM_DETAILS[n];
+        var datePart = (d.exp && d.exp !== '—') ? '有效期 ' + d.exp : '无有效期';
+        var locPart = d.loc ? ' · ' + d.loc : '';
+        var sub = datePart + locPart;
+        return '<div class="item-row" data-action="go-date-pick-item" data-item="' + n + '"><div class="item-thumb">' + cal + '</div><div><div class="i-name">' + n + '</div><div class="i-sub">' + sub + '</div></div></div>';
+      }).join('');
     }).join('');
+    el.innerHTML = html;
   }
   function fillDetail(name) {
     var d = ITEM_DETAILS[name] || ITEM_DETAILS['布洛芬缓释胶囊'];
@@ -2537,6 +2567,7 @@
   function enterDetailEdit() {
     var d = ITEM_DETAILS[_viewingItem] || ITEM_DETAILS['布洛芬缓释胶囊'];
     var f = document.getElementById('ed-name'); if (f) f.textContent = _viewingItem;
+    var fcat = document.getElementById('ed-cat'); if (fcat) fcat.value = normalizeCat(itemCategory(d));
     var floc = document.getElementById('ed-loc'); if (floc) floc.innerHTML = locOptionsHtml(d.loc);
     var fq = document.getElementById('ed-qty'); if (fq) fq.textContent = d.qty || '1';
     var ft = document.getElementById('ed-tags'); if (ft) ft.textContent = d.tags ? d.tags.replace(/<[^>]*>/g, '') : '';
@@ -2582,10 +2613,14 @@
     var batch = (document.getElementById('ed-batch') ? document.getElementById('ed-batch').textContent.trim() : '') || '—';
     var note = (document.getElementById('ed-note') ? document.getElementById('ed-note').textContent.trim() : '');
     var old = ITEM_DETAILS[_viewingItem] || {};
-    // 从 meta（如“药品 · 添加于 … @m1”）提取分类；无 category 字段时回退提取 meta 首段
-    var oldCategory = old.category;
-    if (!oldCategory && old.meta) { oldCategory = (old.meta.split('·')[0] || '').trim(); }
-    var cur = { name: newName, category: oldCategory || '物品', loc: loc, qty: qty, tags: tags, prod: prod, exp: exp, batch: batch, note: note, badge: old.badge || 'ok', badgeText: old.badgeText || '正常', added: (old.meta || '').replace(/^.*添加于\s*/, ''), member: (old.meta || '').match(/@(\w+)/) ? (old.meta.match(/@(\w+)/)[1]) : '1', photo: old.photo || '' };
+    var catEl = document.getElementById('ed-cat');
+    var cat = catEl ? catEl.value : '';
+    if (!cat) {
+      var oldCategory = old.category;
+      if (!oldCategory && old.meta) { oldCategory = (old.meta.split('·')[0] || '').trim(); }
+      cat = oldCategory || '物品';
+    }
+    var cur = { name: newName, category: cat, loc: loc, qty: qty, tags: tags, prod: prod, exp: exp, batch: batch, note: note, badge: old.badge || 'ok', badgeText: old.badgeText || '正常', added: (old.meta || '').replace(/^.*添加于\s*/, ''), member: (old.meta || '').match(/@(\w+)/) ? (old.meta.match(/@(\w+)/)[1]) : '1', photo: old.photo || '' };
     // 持久化到 localStorage（用户物品 + 演示物品都可编辑保存）
     // 若改名（newName !== 旧名），先把旧名从数据源剔除，旧名加入删除清单，避免刷新后“旧名复活”
     if (newName !== _viewingItem) {
