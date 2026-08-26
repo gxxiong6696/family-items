@@ -2647,7 +2647,8 @@
       if (!oldCategory && old.meta) { oldCategory = (old.meta.split('·')[0] || '').trim(); }
       cat = oldCategory || '物品';
     }
-    var cur = { name: newName, category: cat, loc: loc, qty: qty, tags: tags, prod: prod, exp: exp, batch: batch, note: note, badge: old.badge || 'ok', badgeText: old.badgeText || '正常', added: (old.meta || '').replace(/^.*添加于\s*/, ''), member: (old.meta || '').match(/@(\w+)/) ? (old.meta.match(/@(\w+)/)[1]) : '1', photo: old.photo || '' };
+    var isDateCat = !!CAT_WITH_DATE[cat];
+    var cur = { name: newName, category: cat, loc: loc, qty: qty, tags: tags, prod: prod, exp: exp, batch: batch, note: note, badge: isDateCat ? (old.badge || 'ok') : 'ok', badgeText: isDateCat ? (old.badgeText || '正常') : '正常', added: (old.meta || '').replace(/^.*添加于\s*/, ''), member: (old.meta || '').match(/@(\w+)/) ? (old.meta.match(/@(\w+)/)[1]) : '1', photo: old.photo || '' };
     // 持久化到 localStorage（用户物品 + 演示物品都可编辑保存）
     // 若改名（newName !== 旧名），先把旧名从数据源剔除，旧名加入删除清单，避免刷新后“旧名复活”
     if (newName !== _viewingItem) {
@@ -3084,12 +3085,15 @@
     var items = getAllItems();
     var expiring = [], expired = [], warranty = [];
     items.forEach(function (it) {
-      var exp = itemExp(it.name);
-      if (exp) {
-        var days = daysUntil(exp);
-        if (days !== null) {
-          if (days < 0) { expired.push({ name: it.name, loc: it.loc, days: days, exp: exp }); }
-          else if (days <= 30) { expiring.push({ name: it.name, loc: it.loc, days: days, exp: exp }); }
+      // 只有“药品/食品”等带效期类别才参与临期/过期提醒（改类别后不再残留）
+      if (CAT_WITH_DATE[it.cat]) {
+        var exp = itemExp(it.name);
+        if (exp) {
+          var days = daysUntil(exp);
+          if (days !== null) {
+            if (days < 0) { expired.push({ name: it.name, loc: it.loc, days: days, exp: exp }); }
+            else if (days <= 30) { expiring.push({ name: it.name, loc: it.loc, days: days, exp: exp }); }
+          }
         }
       }
       var w = itemWarrantyNote(it.name);
