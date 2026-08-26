@@ -1833,10 +1833,14 @@
     var family = null;
     try { family = localStorage.getItem('FAMILY_KEY'); } catch (e) {}
     var payload = {
-      __meta: { app: 'family-items', version: 1, exportedAt: new Date().toISOString() },
+      __meta: { app: 'family-items', version: 2, exportedAt: new Date().toISOString() },
       familyName: family || '',
       members: members,
-      items: items
+      items: items,
+      locations: loadLocations(),
+      deletedItems: loadDeleted(),
+      deletedLocs: loadDeletedLocs(),
+      locRenames: loadLocRenamed()
     };
     var json = JSON.stringify(payload, null, 2);
     var blob = new Blob([json], { type: 'application/json;charset=utf-8' });
@@ -1872,14 +1876,37 @@
           var obj = JSON.parse(reader.result);
           if (!obj || typeof obj !== 'object') { toast('导入失败：无效 JSON'); cleanup(); return; }
           if (obj.__meta && obj.__meta.app === 'family-items') {
-            // 新格式（导出备份生成）
+            // 全量恢复：先清空旧用户数据，再按备份覆盖写入
             var family = (obj.familyName != null) ? obj.familyName : '';
             var members = Array.isArray(obj.members) ? obj.members : null;
             var items = Array.isArray(obj.items) ? obj.items : null;
+            var locs = Array.isArray(obj.locations) ? obj.locations : null;
+            var delItems = Array.isArray(obj.deletedItems) ? obj.deletedItems : null;
+            var delLocs = Array.isArray(obj.deletedLocs) ? obj.deletedLocs : null;
+            var locRens = (obj.locRenames && typeof obj.locRenames === 'object') ? obj.locRenames : null;
+
             if (family !== '') { try { localStorage.setItem('FAMILY_KEY', family); } catch (e) {} }
             if (members) saveMembers(members);
-            if (items) saveUserItems(items);
-            toast('导入成功');
+            saveUserItems(items || []);      // 覆盖用户物品
+            saveLocations(locs || []);       // 覆盖自定义位置
+            saveDeletedLocs(delLocs || []);  // 覆盖已删除位置
+            saveLocRenamed(locRens || {});   // 覆盖内置房间改名
+
+            // “原有数据未清除”：导入后只显示备份里的物品，隐藏未在备份中的内置演示物品
+            var keep = (items || []).map(function (it) { return it.name; });
+            var del = (delItems || []).slice();
+            DEMO_ITEMS.forEach(function (dm) {
+              if (keep.indexOf(dm.name) < 0 && del.indexOf(dm.name) < 0) del.push(dm.name);
+            });
+            saveDeleted(del);
+
+            mergeUserItemsIntoDetails();
+            renderItemLists();
+            renderReminderCenter();
+            renderMembers();
+            renderFamily();
+            renderSelfCard();
+            toast('导入成功（已覆盖现有数据）');
           } else if (Array.isArray(obj)) {
             // 兼容：整包是个数组，视为用户物品
             saveUserItems(obj);
