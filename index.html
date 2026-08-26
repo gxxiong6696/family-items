@@ -511,13 +511,13 @@
                 <span class="meta" style="font-size: 11px;">拍一下自动录入</span>
               </span>
             </button>
-            <button class="card row" style="gap: 12px; text-align: left; cursor: pointer; border: none; min-height: 76px;" data-action="go-medicine">
+            <button class="card row" style="gap: 12px; text-align: left; cursor: pointer; border: none; min-height: 76px;" data-action="go-scan-date">
               <span style="width: 40px; height: 40px; border-radius: 12px; background: var(--accent-soft); display: grid; place-items: center; flex-shrink: 0;">
-                <svg viewBox="0 0 24 24" style="width: 20px; height: 20px; stroke: var(--accent-deep); fill: none; stroke-width: 1.7;"><path d="M10.5 20.5a6 6 0 0 1-8.5-8.5l9-9 8.5 8.5-9 9z"/><path d="M6.5 10.5h9"/></svg>
+                <svg viewBox="0 0 24 24" style="width: 20px; height: 20px; stroke: var(--accent-deep); fill: none; stroke-width: 1.7;"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>
               </span>
               <span>
-                <span style="display: block; font-weight: 600; font-size: 14px;">扫药品</span>
-                <span class="meta" style="font-size: 11px;">自动识别效期</span>
+                <span style="display: block; font-weight: 600; font-size: 14px;">扫日期</span>
+                <span class="meta" style="font-size: 11px;">给带效期物品补/改日期</span>
               </span>
             </button>
           </section>
@@ -960,7 +960,7 @@
               <div class="skeleton" style="width: 160px; height: 16px; margin: 0 auto 8px;"></div>
               <div class="skeleton" style="width: 220px; height: 12px; margin: 0 auto;"></div>
             </div>
-            <p class="meta" style="text-align: center; margin-top: 4px;">正在识别名称、分类与存放建议…</p>
+            <p class="meta" style="text-align: center; margin-top: 4px;" id="scan-status">正在识别名称、分类与存放建议…</p>
             <button class="btn-secondary" style="min-height: 44px; font-size: 13px;" data-action="go-scan-error">识别失败？手动填写</button>
           </section>
         </section>
@@ -1050,8 +1050,8 @@
         <!-- ════════════ F4 药品扫描（取景） ════════════ -->
         <section class="page" id="page-medicine" data-od-id="page-medicine">
           <div class="flow-bar">
-            <button class="back-btn" aria-label="返回" data-action="go-home"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>
-            <div class="flow-title">药品效期扫描</div>
+            <button class="back-btn" aria-label="返回" data-action="go-date-back"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>
+            <div class="flow-title">扫描日期</div>
             <div class="progress-dots" style="margin: 0 0 0 auto; gap: 4px;"><span class="on"></span><span></span><span></span></div>
           </div>
 
@@ -1061,15 +1061,15 @@
               <div id="camera-hint" style="position:absolute; inset:0; display:none; align-items:center; justify-content:center; text-align:center; color:rgba(255,255,255,.9); font-size:14px; padding:0 24px; z-index:1; box-sizing:border-box;"></div>
               <div class="frame-line"></div>
               <div class="scan-tip">
-                对准药品包装上的日期区域
-                <span class="mono">识别范围：生产日期 / 有效期至 / 批号</span>
+                对准包装上的日期区域
+                <span class="mono">拍摄后确认日期，回填到物品</span>
               </div>
             </div>
           </section>
 
           <section class="pad" style="padding: 18px 20px; text-align: center;">
             <button class="shutter-btn" aria-label="拍摄" id="shutter-med"></button>
-            <p class="meta" style="margin-top: 10px;">自动识别并填入效期信息</p>
+            <p class="meta" style="margin-top: 10px;">拍摄后确认并保存日期</p>
           </section>
         </section>
 
@@ -1092,7 +1092,7 @@
               <div class="skeleton" style="width: 140px; height: 14px; margin: 0 auto 8px;"></div>
               <div class="skeleton" style="width: 200px; height: 11px; margin: 0 auto;"></div>
             </div>
-            <p class="meta" style="text-align: center;">正在识别：药品名称、生产日期、有效期、批号…</p>
+            <p class="meta" style="text-align: center;" id="med-status">正在识别：药品名称、生产日期、有效期、批号…</p>
             <button class="btn-secondary" style="min-height: 44px; font-size: 13px;" data-action="go-medicine-error">识别失败？手动填写</button>
           </section>
         </section>
@@ -1122,8 +1122,8 @@
         <!-- ════════════ F6 药品扫描（OCR 结果确认） ════════════ -->
         <section class="page" id="page-medicine-confirm" data-od-id="page-medicine-confirm">
           <div class="flow-bar">
-            <button class="back-btn" aria-label="返回" data-action="go-medicine-scanning"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>
-            <div class="flow-title">确认药品效期</div>
+            <button class="back-btn" aria-label="返回" data-action="go-medicine"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>
+            <div class="flow-title">确认日期并保存</div>
             <div class="progress-dots" style="margin: 0 0 0 auto; gap: 4px;"><span class="on"></span><span class="on"></span><span class="on"></span></div>
           </div>
 
@@ -1138,21 +1138,21 @@
             </div>
 
             <div class="field">
-              <label for="m-name">药品名称</label>
+              <label for="m-name">物品名称</label>
               <div class="input editable" id="m-name" contenteditable="true" role="textbox" aria-multiline="false">待填写</div>
               <div class="hint" id="m-name-hint"><span class="conf">·</span> 等待识别结果，也可手动填写</div>
             </div>
 
             <div class="field">
               <label for="m-prod">生产日期</label>
-              <div class="input editable" id="m-prod" contenteditable="true" role="textbox" aria-multiline="false">—</div>
-              <div class="hint" id="m-prod-hint"><span class="conf">·</span> 待识别，也可手动填写</div>
+              <input class="input editable" type="date" id="m-prod">
+              <div class="hint" id="m-prod-hint"><span class="conf">·</span> 日历选择生产日期</div>
             </div>
 
             <div class="field">
               <label for="m-exp">有效期至</label>
-              <div class="input editable" id="m-exp" contenteditable="true" role="textbox" aria-multiline="false">—</div>
-              <div class="hint" id="m-exp-hint"><span class="conf">·</span> 待识别，将自动加入临期提醒（提前 30 天）</div>
+              <input class="input editable" type="date" id="m-exp">
+              <div class="hint" id="m-exp-hint"><span class="conf">·</span> 日历选择有效期，将自动加入临期提醒（提前 30 天）</div>
             </div>
 
             <div class="field">
@@ -1169,7 +1169,19 @@
           </section>
 
           <section class="pad" style="padding-top: 8px;">
-            <button class="btn-primary" id="save-medicine" data-toast="已加入药品库并挂提醒">保存并加入提醒</button>
+            <button class="btn-primary" id="save-medicine" data-toast="已更新日期">保存效期</button>
+          </section>
+        </section>
+
+        <!-- ════════════ 扫日期 · 选择物品 ════════════ -->
+        <section class="page" id="page-date-pick" data-od-id="page-date-pick">
+          <div class="flow-bar">
+            <button class="back-btn" aria-label="返回" data-action="go-home"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>
+            <div class="flow-title">扫日期 · 选择物品</div>
+          </div>
+          <section class="pad" style="padding-top: 8px;">
+            <p class="meta" style="margin-bottom: 8px;">选择要为哪个物品更新日期（生产日期 / 有效期 / 批号）</p>
+            <div id="date-pick-list"></div>
           </section>
         </section>
 
@@ -1245,11 +1257,11 @@
             <div class="grid-2">
               <div class="field">
                 <label>生产日期</label>
-                <div class="input editable" id="ed-prod" contenteditable="true" role="textbox"></div>
+                <input class="input editable" type="date" id="ed-prod">
               </div>
               <div class="field">
                 <label>有效期至</label>
-                <div class="input editable" id="ed-exp" contenteditable="true" role="textbox"></div>
+                <input class="input editable" type="date" id="ed-exp">
               </div>
             </div>
             <div class="field">
@@ -1267,6 +1279,7 @@
           </section>
 
           <section class="pad stack" style="gap: 10px; margin-top: 16px;">
+            <button class="btn-secondary" id="dt-scan-date" data-action="go-detail-scan-date" style="display:none;">扫日期 · 更新效期</button>
             <button class="btn-primary" data-action="edit-item">编辑物品</button>
             <button class="btn-secondary" style="color: var(--danger);" data-action="delete-item">删除物品</button>
             <p class="meta" style="text-align: center;">管理员与成员可编辑 · 访客只读</p>
@@ -1888,31 +1901,53 @@
     return false;
   }
 
-  var _mobilenet = null, _mnetReady = false;
+  var _mobilenet = null, _mnetReady = false, _mnetFailed = false;
+  // 识别模型：本地优先（同源可离线/国内），失败回退 CDN
+  var MODEL_LOCAL_TF = 'models/lib/tf.min.js';
+  var MODEL_LOCAL_MN = 'models/lib/mobilenet.min.js';
+  var MODEL_LOCAL_JSON = 'models/mobilenet_v2/model.json';
+  var MODEL_CDN_TF = 'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js';
+  var MODEL_CDN_MN = 'https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2.1.1/dist/mobilenet.min.js';
   function loadScript(src, cb) {
     var s = document.createElement('script');
     s.src = src; s.async = true;
-    s.onload = cb; s.onerror = function () {};
+    var done = false;
+    function fin(ok) { if (done) return; done = true; if (cb) cb(ok); }
+    s.onload = function () { fin(true); };
+    s.onerror = function () { fin(false); };
     document.head.appendChild(s);
+  }
+  // 先加载本地库，失败再加载 CDN 库
+  function loadWithFallback(local, cdn, cb) {
+    loadScript(local, function (ok) { if (ok) { cb(true); return; } loadScript(cdn, function (ok2) { cb(ok2); }); });
   }
   function ensureRecognitionModel(cb) {
     if (_mnetReady) { if (cb) cb(true); return; }
-    if (!window.mobilenet) {
-      loadScript('https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js', function () {
-        loadScript('https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2.1.1/dist/mobilenet.min.js', function () {
-          if (window.mobilenet) {
-            window.mobilenet.load({ version: 2, alpha: 0.25 }).then(function (m) {
-              _mobilenet = m; _mnetReady = true; if (cb) cb(true);
-            }).catch(function () { if (cb) cb(false); });
-          } else { if (cb) cb(false); }
+    if (_mnetFailed) { if (cb) cb(false); return; }
+    function loadModel() {
+      window.mobilenet.load({ version: 2, alpha: 1.0, modelUrl: MODEL_LOCAL_JSON })
+        .then(function (m) { _mobilenet = m; _mnetReady = true; if (cb) cb(true); })
+        .catch(function () {
+          // 本地模型不可用（如未打包部署）→ 回退 CDN 云端模型
+          window.mobilenet.load({ version: 2, alpha: 1.0 })
+            .then(function (m) { _mobilenet = m; _mnetReady = true; if (cb) cb(true); })
+            .catch(function () { _mnetFailed = true; if (cb) cb(false); });
         });
-      });
-    } else {
-      window.mobilenet.load({ version: 2, alpha: 0.25 }).then(function (m) {
-        _mobilenet = m; _mnetReady = true; if (cb) cb(true);
-      }).catch(function () { if (cb) cb(false); });
     }
-    setTimeout(function () { if (!_mnetReady && cb) cb(false); }, 8000);
+    function loadMobilenet() {
+      if (window.mobilenet) { loadModel(); return; }
+      loadWithFallback(MODEL_LOCAL_MN, MODEL_CDN_MN, function (ok) {
+        if (ok && window.mobilenet) { loadModel(); } else { _mnetFailed = true; if (cb) cb(false); }
+      });
+    }
+    function loadTf() {
+      if (window.tf) { loadMobilenet(); return; }
+      loadWithFallback(MODEL_LOCAL_TF, MODEL_CDN_TF, function (ok) {
+        if (ok && window.tf) { loadMobilenet(); } else { _mnetFailed = true; if (cb) cb(false); }
+      });
+    }
+    loadTf();
+    setTimeout(function () { if (!_mnetReady && !_mnetFailed) { _mnetFailed = true; if (cb) cb(false); } }, 20000);
   }
   var LABEL_NAME_CN = {
     'headphone': '无线耳机', 'earphone': '无线耳机', 'cellular telephone': '手机', 'mobile phone': '手机', 'remote control': '遥控器', 'radio': '收音机', 'iPod': '音乐播放器', 'laptop': '笔记本电脑', 'computer keyboard': '键盘', 'mouse': '鼠标', 'television': '电视', 'monitor': '显示器', 'digital watch': '电子手表', 'camera': '相机', 'pendrive': 'U盘', 'accesory': '配件', 'notebook': '笔记本', 'library': '笔记本电脑',
@@ -2446,6 +2481,24 @@
     '工具箱': { badge: 'ok', badgeText: '正常', meta: '工具 · 添加于 2026-04-05 · @m1', loc: '储物间 · 工具架', qty: '1 套', prod: '—', exp: '—', batch: '—', tags: '<span class="tag" style="margin-right: 6px;">工具</span>', note: '含扳手、螺丝刀、卷尺。' }
   };
 
+  function itemCategory(d) { if (d && d.category) return d.category; if (d && d.meta) { var f = (d.meta.split('·')[0] || '').trim(); return f || '物品'; } return '物品'; }
+  function itemHasDate(d) { return !!CAT_WITH_DATE[itemCategory(d)]; }
+  function renderDatePick() {
+    var el = document.getElementById('date-pick-list');
+    if (!el) return;
+    var names = [];
+    Object.keys(ITEM_DETAILS).forEach(function (n) { var d = ITEM_DETAILS[n]; if (d && itemHasDate(d)) names.push(n); });
+    if (!names.length) {
+      el.innerHTML = '<div class="empty-state"><div class="empty-icon"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg></div><h3>暂无带日期的物品</h3><p>先在「拍照添加」里添加带生产日期/有效期的物品</p></div>';
+      return;
+    }
+    var cal = '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>';
+    el.innerHTML = names.map(function (n) {
+      var d = ITEM_DETAILS[n]; var cat = itemCategory(d);
+      var sub = cat + (d.exp ? ' · 有效期 ' + d.exp : ' · 无有效期');
+      return '<div class="item-row" data-action="go-date-pick-item" data-item="' + n + '"><div class="item-thumb">' + cal + '</div><div><div class="i-name">' + n + '</div><div class="i-sub">' + sub + '</div></div></div>';
+    }).join('');
+  }
   function fillDetail(name) {
     var d = ITEM_DETAILS[name] || ITEM_DETAILS['布洛芬缓释胶囊'];
     document.getElementById('dt-name').textContent = name;
@@ -2460,6 +2513,8 @@
     document.getElementById('dt-batch').textContent = d.batch;
     document.getElementById('dt-tags').innerHTML = d.tags;
     document.getElementById('dt-note').textContent = d.note;
+    // 带日期(药品/食品)的物品显示“扫日期”按钮，否则隐藏
+    var sd = document.getElementById('dt-scan-date'); if (sd) sd.style.display = itemHasDate(d) ? '' : 'none';
     // 拍照添加的物品回显照片（无则保留占位）
     var ph = document.getElementById('dt-photo');
     if (ph) {
@@ -2477,15 +2532,17 @@
 
   /* ── 物品编辑态 ── */
   var _viewingItem = '布洛芬缓释胶囊';
+  var _scanDateItem = null, _scanReturnPage = 'page-home';
+  var CAT_WITH_DATE = { '药品': 1, '食品': 1 };
   function enterDetailEdit() {
     var d = ITEM_DETAILS[_viewingItem] || ITEM_DETAILS['布洛芬缓释胶囊'];
     var f = document.getElementById('ed-name'); if (f) f.textContent = _viewingItem;
     var floc = document.getElementById('ed-loc'); if (floc) floc.innerHTML = locOptionsHtml(d.loc);
     var fq = document.getElementById('ed-qty'); if (fq) fq.textContent = d.qty || '1';
     var ft = document.getElementById('ed-tags'); if (ft) ft.textContent = d.tags ? d.tags.replace(/<[^>]*>/g, '') : '';
-    var fp = document.getElementById('ed-prod'); if (fp) fp.textContent = d.prod || '—';
-    var fe = document.getElementById('ed-exp'); if (fe) fe.textContent = d.exp || '—';
-    var fb = document.getElementById('ed-batch'); if (fb) fb.textContent = d.batch || '—';
+    var fp = document.getElementById('ed-prod'); if (fp) fp.value = (d.prod && d.prod !== '—') ? d.prod : '';
+    var fe = document.getElementById('ed-exp'); if (fe) fe.value = (d.exp && d.exp !== '—') ? d.exp : '';
+    var fb = document.getElementById('ed-batch'); if (fb) fb.textContent = (d.batch && d.batch !== '—') ? d.batch : '';
     var fn = document.getElementById('ed-note'); if (fn) fn.textContent = d.note || '';
     var views = document.getElementById('detail-views'); if (views) views.style.display = 'none';
     var form = document.getElementById('detail-edit-form'); if (form) form.style.display = 'block';
@@ -2520,8 +2577,8 @@
     var loc = (document.getElementById('ed-loc') ? document.getElementById('ed-loc').value : '') || '未设置';
     var qty = (document.getElementById('ed-qty') ? document.getElementById('ed-qty').textContent.trim() : '') || '1';
     var tags = (document.getElementById('ed-tags') ? document.getElementById('ed-tags').textContent.trim() : '');
-    var prod = (document.getElementById('ed-prod') ? document.getElementById('ed-prod').textContent.trim() : '') || '—';
-    var exp = (document.getElementById('ed-exp') ? document.getElementById('ed-exp').textContent.trim() : '') || '—';
+    var prod = (document.getElementById('ed-prod') ? document.getElementById('ed-prod').value : '') || '—';
+    var exp = (document.getElementById('ed-exp') ? document.getElementById('ed-exp').value : '') || '—';
     var batch = (document.getElementById('ed-batch') ? document.getElementById('ed-batch').textContent.trim() : '') || '—';
     var note = (document.getElementById('ed-note') ? document.getElementById('ed-note').textContent.trim() : '');
     var old = ITEM_DETAILS[_viewingItem] || {};
@@ -2591,6 +2648,8 @@
       case 'go-profile':     showPage('page-profile'); break;
       case 'go-detail':
         _viewingItem = el.getAttribute('data-item') || '布洛芬缓释胶囊';
+        _scanDateItem = _viewingItem;
+        _scanReturnPage = 'page-detail';
         fillDetail(_viewingItem);
         resetDetailEditMode();
         showPage('page-detail');
@@ -2621,6 +2680,10 @@
       case 'go-scan-error':  inFlow = true; showPage('page-scan-error'); break;
       case 'go-scanning':    inFlow = true; showPage('page-scanning'); break;
       case 'go-scan-confirm': inFlow = true; showPage('page-scan-confirm'); break;
+      case 'go-scan-date':   inFlow = true; window.__lastShotDataURL = ''; renderDatePick(); showPage('page-date-pick'); break;
+      case 'go-date-pick-item': inFlow = true; window.__lastShotDataURL = ''; _scanDateItem = el.getAttribute('data-item'); _scanReturnPage = 'page-home'; showPage('page-medicine'); startCamera(); break;
+      case 'go-detail-scan-date': inFlow = true; window.__lastShotDataURL = ''; _scanReturnPage = 'page-detail'; showPage('page-medicine'); startCamera(); break;
+      case 'go-date-back':   try { stopCamera(); } catch (e) {} showPage(_scanReturnPage || 'page-home'); break;
       case 'go-medicine':    inFlow = true; window.__lastShotDataURL = ''; showPage('page-medicine'); startCamera(); break;
       case 'go-medicine-error': inFlow = true; showPage('page-medicine-error'); break;
       case 'go-medicine-scanning': inFlow = true; showPage('page-medicine-scanning'); break;
@@ -2708,7 +2771,9 @@
     stopCamera();
     inFlow = true;
     showPage('page-scanning');
+    var _st = document.getElementById('scan-status'); if (_st) _st.textContent = '正在加载识别模型…';
     ensureRecognitionModel(function (ok) {
+      var _st2 = document.getElementById('scan-status'); if (_st2) _st2.textContent = ok ? '正在识别物品信息…' : '识别模型加载失败，请检查网络后重试';
       recognizeItem(frame, function (res) {
         var img = document.getElementById('scan-confirm-ph');
         if (img) {
@@ -3081,34 +3146,21 @@
     window.__lastShotDataURL = frame;
     stopCamera();
     inFlow = true;
-    showPage('page-medicine-scanning');
-    ensureRecognitionModel(function (ok) {
-      recognizeItem(frame, function (res) {
-        var img = document.getElementById('med-confirm-ph');
-        if (img) {
-          img.textContent = '';
-          if (frame) { img.style.backgroundSize = 'cover'; img.style.backgroundImage = 'url(' + frame + ')'; img.style.backgroundPosition = 'center'; }
-        }
-        var mname = document.getElementById('m-name');
-        if (res && res.category) {
-          var theName = (res.name ? res.name.split(',')[0].trim() : (res.category === '药品' ? '药品' : res.category));
-          if (mname) mname.textContent = theName || '待填写';
-          var sName = document.getElementById('med-confirm-name'); if (sName) sName.textContent = theName || '——';
-          var sStatus = document.getElementById('med-confirm-status'); if (sStatus) sStatus.textContent = '已识别为「' + res.category + '」';
-          var sTip = document.getElementById('med-confirm-tip'); if (sTip) sTip.textContent = '请核对并补充药品效期信息';
-          var hint = document.getElementById('m-name-hint'); if (hint) hint.innerHTML = '<span class="conf">✓ 已识别</span> · 点击可修改';
-          var mloc = document.getElementById('m-loc');
-          if (mloc) { mloc.value = '药箱 · 上层'; }
-        } else {
-          if (mname) mname.textContent = '待填写';
-          var sName2 = document.getElementById('med-confirm-name'); if (sName2) sName2.textContent = '未识别到药品';
-          var sStatus2 = document.getElementById('med-confirm-status'); if (sStatus2) sStatus2.textContent = '未识别到药品';
-          var sTip2 = document.getElementById('med-confirm-tip'); if (sTip2) sTip2.textContent = '请在下方手动填写药品信息与效期，或重新拍摄';
-          var hint2 = document.getElementById('m-name-hint'); if (hint2) hint2.innerHTML = '<span class="conf">·</span> 未识别，请手动填写';
-        }
-        showPage('page-medicine-confirm');
-      });
-    });
+    var itemName = _scanDateItem || '物品';
+    var d = ITEM_DETAILS[itemName] || {};
+    var img = document.getElementById('med-confirm-ph');
+    if (img) { img.textContent = ''; if (frame) { img.style.backgroundSize = 'cover'; img.style.backgroundImage = 'url(' + frame + ')'; img.style.backgroundPosition = 'center'; } }
+    var mname = document.getElementById('m-name'); if (mname) mname.textContent = itemName;
+    var sName = document.getElementById('med-confirm-name'); if (sName) sName.textContent = itemName;
+    var sStatus = document.getElementById('med-confirm-status'); if (sStatus) sStatus.textContent = '为「' + itemName + '」更新日期';
+    var sTip = document.getElementById('med-confirm-tip'); if (sTip) sTip.textContent = '请确认或修改日期后保存';
+    var h1 = document.getElementById('m-name-hint'); if (h1) h1.innerHTML = '<span class="conf">✓</span> 将更新该物品的日期';
+    var mp = document.getElementById('m-prod'); if (mp) mp.value = (d.prod && d.prod !== '—') ? d.prod : '';
+    var me = document.getElementById('m-exp'); if (me) me.value = (d.exp && d.exp !== '—') ? d.exp : '';
+    var mb = document.getElementById('m-batch'); if (mb) mb.textContent = (d.batch && d.batch !== '—') ? d.batch : '';
+    var mloc = document.getElementById('m-loc');
+    if (mloc) { mloc.innerHTML = (typeof locOptionsHtml === 'function' ? locOptionsHtml(d.loc || '') : ''); }
+    showPage('page-medicine-confirm');
   });
 
   document.getElementById('save-medicine').addEventListener('click', function () {
@@ -3116,15 +3168,15 @@
     var prodEl = document.getElementById('m-prod');
     var expEl = document.getElementById('m-exp');
     var batchEl = document.getElementById('m-batch');
-    var name = nameEl ? nameEl.textContent.trim() : '药品';
-    var prod = prodEl ? prodEl.textContent.trim() : '';
-    var exp = expEl ? expEl.textContent.trim() : '';
+    var name = (nameEl ? nameEl.textContent.trim() : '') || _scanDateItem || '物品';
+    var prod = prodEl ? prodEl.value : '';
+    var exp = expEl ? expEl.value : '';
     var batch = batchEl ? batchEl.textContent.trim() : '';
-    var loc = '药箱 · 上层';
+    var loc = '';
     var locEl = document.getElementById('m-loc');
     if (locEl && locEl.value) loc = locEl.value;
+    var d = ITEM_DETAILS[name] || {};
     var today = new Date();
-    var dstr = today.toISOString().slice(0, 10);
     var badge = 'ok', badgeText = '正常';
     if (exp) {
       var expDate = new Date(exp);
@@ -3134,17 +3186,25 @@
         else if (days <= 30) { badge = 'warn'; badgeText = days + ' 天'; }
       }
     }
+    // 更新已有物品的日期，不新建；保留原有分类/数量/标签/备注/照片
+    var oldCat = d.category || itemCategory(d);
+    var dm = (d.meta || '').match(/添加于\s*([\d-]+)/);
+    var dstr = (dm && dm[1]) || today.toISOString().slice(0, 10);
+    var member = (((d.meta || '').match(/@(\w+)/) || [])[1]) || '1';
     upsertUserItem({
-      name: name, category: '药品',
-      loc: loc, qty: '1', tags: '<span class="tag" style="margin-right: 6px;">常用</span>',
-      badge: badge, badgeText: badgeText, added: dstr, member: '1',
-      note: '效期：' + (exp || '不限'), prod: prod, exp: exp, batch: batch, photo: window.__lastShotDataURL || ''
+      name: name, category: oldCat,
+      loc: loc || d.loc || '未设置', qty: d.qty || '1', tags: d.tags || '',
+      badge: badge, badgeText: badgeText, added: dstr, member: member,
+      note: d.note || '', prod: prod, exp: exp, batch: batch, photo: d.photo || ''
     });
     mergeUserItemsIntoDetails();
     renderItemLists();
     renderReminderCenter();
-    toast('已加入药品库并挂提醒');
-    setTimeout(goHome, 700);
+    refreshLocationCounts();
+    toast('已更新日期');
+    _viewingItem = name; fillDetail(name);
+    resetDetailEditMode();
+    showPage('page-detail');
   });
 
   /* ── tag selection (single-select) ── */
