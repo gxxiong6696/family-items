@@ -3675,7 +3675,6 @@
 
   /* ═══════════ 软件授权 / 试用期到期提醒（离线授权） ═══════════ */
   // 私密口令：必须与「注册码生成器.html」里的私密口令完全一致；正式使用请改成你自己的口令（两端同步改）
-  var LICENSE_SECRET = '3FA2826CCE58744B91D5FE8AEE19408D';
   var LICENSE_KEY = 'family-license-v1';
   var DEVICE_KEY = 'family-device-code';
   var TRIAL_DAYS = 60;              // 试用 2 个月
@@ -3798,7 +3797,8 @@
     }
   }
 
-  // —— 注册码 AES-256-GCM 加密（V3.0，与生成器同一算法）——
+  // —— 注册码 非对称签名（V4.0）：私钥只在生成器，App 只放公钥验证 ——
+  var LICENSE_PUBKEY = {"key_ops":["verify"],"ext":true,"kty":"EC","x":"6jJ_n6s5_eq0uw0_rDebWiLJH_5lRtrQBLF1n51mXrg","y":"K84cVDp-U5GWILbUA8vwMzFILHeZztxA-mMBkfiu0ak","crv":"P-256"};
   function hexToBytes(hex){
     var out = new Uint8Array(hex.length / 2);
     for (var i = 0; i < out.length; i++) out[i] = parseInt(hex.substr(i*2, 2), 16);
@@ -3807,33 +3807,17 @@
   function bytesToHex(bytes){
     return Array.prototype.map.call(bytes, function(b){ return ('0'+b.toString(16)).slice(-2); }).join('').toUpperCase();
   }
-  function v3Key(secret){
-    var enc = new TextEncoder();
-    return crypto.subtle.digest('SHA-256', enc.encode(secret + '|family-items-lic-v3'))
-      .then(function(h){ return crypto.subtle.importKey('raw', h, {name:'AES-GCM'}, false, ['encrypt','decrypt']); });
-  }
-  function encLicense(secret, dev, exp){
-    var payload = dev + exp;   // 24 位十六进制：设备码16 + 到期日8
-    var iv = crypto.getRandomValues(new Uint8Array(12));
-    return v3Key(secret).then(function(key){
-      return crypto.subtle.encrypt({name:'AES-GCM', iv:iv}, key, hexToBytes(payload)).then(function(ct){
-        var blob = new Uint8Array(1 + 12 + ct.byteLength);
-        blob[0] = 0x33; blob.set(iv, 1); blob.set(new Uint8Array(ct), 13);
-        return bytesToHex(blob);
+  function verifyLicense(rawHex){
+    var payload = rawHex.slice(0, 24);       // 设备码16 + 到期日8
+    var sig = hexToBytes(rawHex.slice(24));  // ECDSA P-256 签名 64 字节
+    var msg = hexToBytes(payload);
+    return crypto.subtle.importKey('jwk', LICENSE_PUBKEY, {name:'ECDSA', namedCurve:'P-256'}, false, ['verify'])
+      .then(function(key){
+        return crypto.subtle.verify({name:'ECDSA', hash:'SHA-256'}, key, sig, msg).then(function(ok){
+          if (!ok) throw new Error('签名校验失败');
+          return { dev: payload.slice(0,16), exp: payload.slice(16,24) };
+        });
       });
-    });
-  }
-  function decLicense(secret, rawHex){
-    var bytes = hexToBytes(rawHex);
-    if (bytes[0] !== 0x33) return Promise.reject(new Error('版本/格式不支持'));
-    var iv = bytes.slice(1, 13);
-    var ct = bytes.slice(13);
-    return v3Key(secret).then(function(key){
-      return crypto.subtle.decrypt({name:'AES-GCM', iv:iv}, key, ct).then(function(pt){
-        var h = bytesToHex(new Uint8Array(pt));
-        return { dev: h.slice(0,16), exp: h.slice(16,24) };
-      });
-    });
   }
 
   // —— 授权弹窗：输入注册码 ——
@@ -3869,8 +3853,8 @@
   function activateLicense(code, tipEl){
     if (!crypto || !crypto.subtle){ tipEl.style.color = '#dc2626'; tipEl.textContent = '当前环境不支持安全加密，请在 App 或 https 下激活'; return; }
     var raw = (code || '').toUpperCase().replace(/[^0-9A-F]/g, '');
-    if (raw.length < 50){ tipEl.style.color = '#dc2626'; tipEl.textContent = '注册码太短，请完整粘贴（约 82 位）'; return; }
-    decLicense(LICENSE_SECRET, raw).then(function(p){
+    if (raw.length < 50){ tipEl.style.color = '#dc2626'; tipEl.textContent = '注册码太短，请完整粘贴（约 152 位）'; return; }
+    verifyLicense(raw).then(function(p){
       var dev = p.dev, exp = p.exp;
       var devMatch = dev === getDeviceCode();
       var ex = parseExpire(exp);
@@ -3884,12 +3868,12 @@
       toast('激活成功，有效期至 ' + exp.slice(0,4)+'-'+exp.slice(4,6)+'-'+exp.slice(6,8));
     }).catch(function(e){
       tipEl.style.color = '#dc2626';
-      tipEl.textContent = '注册码无效：' + ((e && e.message) || '解密失败');
+      tipEl.textContent = '注册码无效：' + ((e && e.message) || '签名校验失败');
     });
   }
 
   /* ═══════════ 关于本软件 ═══════════ */
-  var APP_VERSION = '3.0';
+  var APP_VERSION = '4.0';
   var APP_AUTHOR = 'Peter.Xiong';
   var APP_MAKER = '智普 AutoClaw 的设计专家系统';
   var APP_DESC = '本软件由 ' + APP_AUTHOR + ' 利用 ' + APP_MAKER + ' 设计。用于家庭物品管理，如有问题和建议或希望长期使用，请与 Peterx 联系：peterx@qq.com。';
