@@ -2658,9 +2658,17 @@
     var sd = document.getElementById('dt-scan-date'); if (sd) sd.style.display = itemHasDate(d) ? '' : 'none';
     // 拍照添加的物品回显照片（无则保留占位）
     var ph = document.getElementById('dt-photo');
+    // 兑底：详情数据源若缺照片，直接从已保存用户物品里找回（解决列表中缩略图有、详情页没有）
+    var dPhoto = d.photo || '';
+    if (!dPhoto) {
+      var _u = loadUserItems();
+      for (var _i = 0; _i < _u.length; _i++) {
+        if (_u[_i] && _u[_i].name === name && _u[_i].photo) { dPhoto = _u[_i].photo; break; }
+      }
+    }
     if (ph) {
-      if (d.photo) {
-        ph.style.backgroundImage = 'url(' + d.photo + ')';
+      if (dPhoto) {
+        ph.style.backgroundImage = 'url(' + dPhoto + ')';
         ph.style.backgroundSize = 'cover';
         ph.style.backgroundPosition = 'center';
         ph.style.color = 'transparent';
