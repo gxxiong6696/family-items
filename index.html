@@ -1936,11 +1936,29 @@
       locRenames: loadLocRenamed()
     };
     var json = JSON.stringify(payload, null, 2);
+    var d = new Date();
+    var name = 'family-items-backup-' + d.getFullYear() + ('0' + (d.getMonth() + 1)).slice(-2) + ('0' + d.getDate()).slice(-2) + '.json';
+    // 原生 APK（Capacitor WebView）没有下载处理器，Blob 下载会静默失败；改走文件系统 + 系统分享
+    if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) {
+      var cp = window.Capacitor.Plugins;
+      if (cp && cp.Filesystem && cp.Share) {
+        cp.Filesystem.writeFile({ path: name, data: json, directory: 'CACHE', encoding: 'utf8' })
+          .then(function (res) {
+            return cp.Filesystem.readFile({ path: name, directory: 'CACHE', encoding: 'utf8' })
+              .then(function (r) {
+                var got = (r && r.data) || '';
+                if (got.length < json.length) { throw new Error('写入不完整 (' + got.length + '/' + json.length + ' 字符)'); }
+                return cp.Share.share({ title: '家庭物品管理系统 备份', files: [res.uri] });
+              });
+          })
+          .then(function () { toast('备份已生成：' + name); })
+          .catch(function (e) { toast('导出失败：' + (e && e.message || '未知错误')); });
+        return;
+      }
+    }
     var blob = new Blob([json], { type: 'application/json;charset=utf-8' });
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
-    var d = new Date();
-    var name = 'family-items-backup-' + d.getFullYear() + ('0' + (d.getMonth() + 1)).slice(-2) + ('0' + d.getDate()).slice(-2) + '.json';
     a.href = url;
     a.download = name;
     document.body.appendChild(a);
@@ -3679,12 +3697,23 @@
     return groups.join('-');
   }
   function copyText(text){
-    if (navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(text).then(function(){ toast('已复制'); }); }
-    else{
-      var ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select();
-      try{ document.execCommand('copy'); toast('已复制'); }catch(e){}
-      document.body.removeChild(ta);
+    function fallback(){
+      try{
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        ta.setAttribute('readonly', '');
+        ta.style.position = 'fixed'; ta.style.top = '0'; ta.style.left = '0'; ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.focus(); ta.select();
+        if (typeof ta.setSelectionRange === 'function') ta.setSelectionRange(0, text.length);
+        var ok = document.execCommand('copy');
+        document.body.removeChild(ta);
+        toast(ok ? '已复制' : '复制失败，请长按手动选择');
+      }catch(e){ toast('复制失败：' + ((e && e.message) || '未知错误')); }
     }
+    if (navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).then(function(){ toast('已复制'); }).catch(function(){ fallback(); });
+    } else { fallback(); }
   }
   function renderLicStatus(){
     var el = document.getElementById('lic-status');
