@@ -431,6 +431,11 @@
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation: none !important; transition: none !important; }
   }
+    /* 日期快捷步进：快速调年/月，一键回今天 */
+    .date-stepper{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;}
+    .date-stepper .ds-btn{flex:1;min-width:50px;padding:6px 0;border:1px solid var(--border,#e6e7eb);background:var(--card,#f4f5f7);border-radius:8px;font-size:12px;line-height:1;color:var(--text,#333);cursor:pointer;-webkit-tap-highlight-color:transparent;transition:background .15s, transform .05s;}
+    .date-stepper .ds-btn:active{transform:scale(.96);background:var(--muted,#eceef1);}
+    .date-stepper .ds-btn.ds-today{min-width:58px;}
 </style>
 </head>
 <body>
@@ -2646,6 +2651,41 @@
   var _viewingItem = '布洛芬缓释胶囊';
   var _scanDateItem = null, _scanReturnPage = 'page-home';
   var CAT_WITH_DATE = { '药品': 1, '食品': 1 };
+
+  /* ── 日期快捷步进：快速调年/月，一键回今天 ── */
+  function dateToYYYYMMDD(d) {
+    var y = d.getFullYear(), m = ('0' + (d.getMonth() + 1)).slice(-2), dd = ('0' + d.getDate()).slice(-2);
+    return y + '-' + m + '-' + dd;
+  }
+  function initDateSteppers() {
+    ['m-prod', 'm-exp', 'ed-prod', 'ed-exp'].forEach(function (id) {
+      var inp = document.getElementById(id);
+      if (!inp || inp.__stepperBound) return;
+      inp.__stepperBound = true;
+      var row = document.createElement('div');
+      row.className = 'date-stepper';
+      row.innerHTML =
+        '<button type="button" class="ds-btn" data-k="y" data-delta="-1">−1年</button>' +
+        '<button type="button" class="ds-btn" data-k="y" data-delta="1">+1年</button>' +
+        '<button type="button" class="ds-btn" data-k="m" data-delta="-1">−1月</button>' +
+        '<button type="button" class="ds-btn" data-k="m" data-delta="1">+1月</button>' +
+        '<button type="button" class="ds-btn ds-today">今天</button>';
+      inp.insertAdjacentElement('afterend', row);
+      row.addEventListener('click', function (e) {
+        var b = e.target.closest('button');
+        if (!b) return;
+        if (b.classList.contains('ds-today')) { inp.value = dateToYYYYMMDD(new Date()); return; }
+        var k = b.getAttribute('data-k');
+        var delta = parseInt(b.getAttribute('data-delta'), 10) || 0;
+        var cur = inp.value ? new Date(inp.value + 'T00:00:00') : new Date();
+        if (isNaN(cur.getTime())) cur = new Date();
+        if (k === 'y') cur.setFullYear(cur.getFullYear() + delta);
+        else cur.setMonth(cur.getMonth() + delta);
+        inp.value = dateToYYYYMMDD(cur);
+      });
+    });
+  }
+
   function enterDetailEdit() {
     var d = ITEM_DETAILS[_viewingItem] || ITEM_DETAILS['布洛芬缓释胶囊'];
     var f = document.getElementById('ed-name'); if (f) f.textContent = _viewingItem;
@@ -3368,6 +3408,7 @@
   }
   ensureLocSelects();
   restoreLocations();
+  initDateSteppers();
   renderItemLists();
   renderReminderCenter();
   refreshItemStatsAll();
