@@ -931,12 +931,13 @@
           </section>
 
           <section class="pad stack" style="gap: 10px;">
-            <div class="card flat row-between" style="cursor: pointer;" data-action="go-license">
-              <span style="display: flex; align-items: center; gap: 10px;">
+            <div class="card flat" style="cursor: pointer;" data-action="go-license">
+              <div style="display: flex; align-items: center; gap: 10px;">
                 <svg viewBox="0 0 24 24" style="width: 19px; height: 19px; stroke: var(--accent); fill: none; stroke-width: 1.7;"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6z"/><path d="M9 12l2 2 4-4"/></svg>
-                <span>软件授权</span>
-              </span>
-              <span class="meta" id="lic-status">试用中 ›</span>
+                <span style="flex: 1;">软件授权</span>
+                <span class="meta" id="lic-status">试用中 ›</span>
+              </div>
+              <div class="meta" id="lic-device" style="margin-top: 8px; font-family: Consolas, monospace; font-size: 12px;">设备特征码：—</div>
             </div>
             <div class="card flat row-between" style="cursor: pointer;" data-action="go-members">
               <span style="display: flex; align-items: center; gap: 10px;">
@@ -3586,7 +3587,7 @@
 
   /* ═══════════ 软件授权 / 试用期到期提醒（离线授权） ═══════════ */
   // 私密口令：必须与「注册码生成器.html」里的私密口令完全一致；正式使用请改成你自己的口令（两端同步改）
-  var LICENSE_SECRET = 'family-items-2026';
+  var LICENSE_SECRET = '3FA2826CCE58744B91D5FE8AEE19408D';
   var LICENSE_KEY = 'family-license-v1';
   var DEVICE_KEY = 'family-device-code';
   var TRIAL_DAYS = 60;              // 试用 2 个月
@@ -3671,8 +3672,24 @@
   }
 
   // —— 我的页：软件授权状态 ——
+  function formatDevice(hex){
+    var t = (hex || '').toUpperCase();
+    var groups = [];
+    for (var i = 0; i < t.length; i += 4) groups.push(t.slice(i, i+4));
+    return groups.join('-');
+  }
+  function copyText(text){
+    if (navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(text).then(function(){ toast('已复制'); }); }
+    else{
+      var ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select();
+      try{ document.execCommand('copy'); toast('已复制'); }catch(e){}
+      document.body.removeChild(ta);
+    }
+  }
   function renderLicStatus(){
     var el = document.getElementById('lic-status');
+    var devEl = document.getElementById('lic-device');
+    if (devEl){ devEl.textContent = '设备特征码：' + formatDevice(getDeviceCode()); }
     if (!el) return;
     var info = licenseInfo();
     if (info.status === 'registered' && info.expire){
@@ -3700,17 +3717,22 @@
       '<div class="lic-box">' +
         '<div class="lic-title">软件授权</div>' +
         '<div class="lic-sub" id="lic-modal-status">' + (info.status === 'registered' && info.expire ? '已注册 · 有效期至 ' + info.expire.slice(0,4)+'-'+info.expire.slice(4,6)+'-'+info.expire.slice(6,8) : '试用期 2 个月，到期前 20 天会提醒') + '</div>' +
+        '<div class="lic-dev-box">' +
+          '<div class="lic-dev-label">你的设备特征码（发给所有者换注册码）</div>' +
+          '<div class="lic-dev-row"><span class="lic-dev-code" id="lic-dev-code">' + formatDevice(getDeviceCode()) + '</span><button class="lic-copy-btn" id="lic-copy-dev">复制</button></div>' +
+        '</div>' +
         '<input id="lic-code" class="lic-input" placeholder="输入注册码，如 A3F1-…-2E4B" autocomplete="off">' +
         '<div class="lic-btns"><button class="lic-btn-primary" id="lic-activate">激 活</button><button class="lic-btn-ghost" id="lic-cancel">关 闭</button></div>' +
         '<div class="lic-tip" id="lic-tip">注册码由所有者离线签发，一码对一机</div>' +
       '</div>';
     document.body.appendChild(overlay);
     var style = document.createElement('style');
-    style.textContent = '#lic-modal .lic-mask{position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:10000}#lic-modal .lic-box{position:fixed;z-index:10001;left:50%;top:50%;transform:translate(-50%,-50%);width:min(92vw,420px);background:#fff;border-radius:16px;padding:22px;box-shadow:0 20px 60px rgba(0,0,0,.25)}#lic-modal .lic-title{font-size:18px;font-weight:700}#lic-modal .lic-sub{color:#6b7688;font-size:12.5px;margin:6px 0 14px}#lic-modal .lic-input{width:100%;padding:12px 14px;border:1px solid #e6eaf2;border-radius:10px;font-size:15px;font-family:monospace;outline:none;box-sizing:border-box}#lic-modal .lic-input:focus{border-color:#2563eb}#lic-modal .lic-btns{display:flex;gap:10px;margin-top:16px}#lic-modal .lic-btn-primary{flex:1;padding:12px;border:none;border-radius:10px;background:#2563eb;color:#fff;font-size:15px;font-weight:600;cursor:pointer}#lic-modal .lic-btn-ghost{flex:1;padding:11px;border:1px solid #e6eaf2;border-radius:10px;background:#fff;color:#3b4252;font-size:15px;cursor:pointer}#lic-modal .lic-tip{color:#9aa3b2;font-size:11.5px;margin-top:12px;text-align:center}';
+    style.textContent = '#lic-modal .lic-mask{position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:10000}#lic-modal .lic-box{position:fixed;z-index:10001;left:50%;top:50%;transform:translate(-50%,-50%);width:min(92vw,420px);background:#fff;border-radius:16px;padding:22px;box-shadow:0 20px 60px rgba(0,0,0,.25)}#lic-modal .lic-title{font-size:18px;font-weight:700}#lic-modal .lic-sub{color:#6b7688;font-size:12.5px;margin:6px 0 14px}#lic-modal .lic-input{width:100%;padding:12px 14px;border:1px solid #e6eaf2;border-radius:10px;font-size:15px;font-family:monospace;outline:none;box-sizing:border-box}#lic-modal .lic-input:focus{border-color:#2563eb}#lic-modal .lic-btns{display:flex;gap:10px;margin-top:16px}#lic-modal .lic-btn-primary{flex:1;padding:12px;border:none;border-radius:10px;background:#2563eb;color:#fff;font-size:15px;font-weight:600;cursor:pointer}#lic-modal .lic-btn-ghost{flex:1;padding:11px;border:1px solid #e6eaf2;border-radius:10px;background:#fff;color:#3b4252;font-size:15px;cursor:pointer}#lic-modal .lic-tip{color:#9aa3b2;font-size:11.5px;margin-top:12px;text-align:center}#lic-modal .lic-dev-box{background:#f6f9ff;border:1px solid #e6eaf2;border-radius:10px;padding:10px 12px;margin-bottom:12px}#lic-modal .lic-dev-label{font-size:11.5px;color:#6b7688;margin-bottom:6px}#lic-modal .lic-dev-row{display:flex;align-items:center;gap:8px}#lic-modal .lic-dev-code{flex:1;font-family:Consolas,monospace;font-size:15px;font-weight:600;color:#1c2333;letter-spacing:.5px;user-select:all}#lic-modal .lic-copy-btn{flex:none;padding:6px 12px;border:1px solid #2563eb;border-radius:8px;background:#fff;color:#2563eb;font-size:12.5px;cursor:pointer}';
     document.head.appendChild(style);
 
     overlay.querySelector('#lic-cancel').addEventListener('click', function(){ overlay.remove(); });
     overlay.querySelector('.lic-mask').addEventListener('click', function(){ overlay.remove(); });
+    overlay.querySelector('#lic-copy-dev').addEventListener('click', function(){ copyText(getDeviceCode()); });
     overlay.querySelector('#lic-activate').addEventListener('click', function(){ activateLicense(overlay.querySelector('#lic-code').value, overlay.querySelector('#lic-tip')); });
     overlay.querySelector('#lic-code').addEventListener('keydown', function(e){ if (e.key === 'Enter') activateLicense(this.value, overlay.querySelector('#lic-tip')); });
   }
