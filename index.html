@@ -436,6 +436,9 @@
     .date-stepper .ds-btn{flex:1;min-width:50px;padding:6px 0;border:1px solid var(--border,#e6e7eb);background:var(--card,#f4f5f7);border-radius:8px;font-size:12px;line-height:1;color:var(--text,#333);cursor:pointer;-webkit-tap-highlight-color:transparent;transition:background .15s, transform .05s;}
     .date-stepper .ds-btn:active{transform:scale(.96);background:var(--muted,#eceef1);}
     .date-stepper .ds-btn.ds-today{min-width:58px;}
+    /* 详情页无照片时：点击拍照添加 */
+    #dt-photo.dt-photo-empty { position: relative; border: 1.5px dashed var(--line, rgba(255,255,255,.2)); background: var(--surface, #1a1a1a) !important; color: var(--muted, #9a9a9a); }
+    #dt-photo.dt-photo-empty .dt-photo-add { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; cursor: pointer; user-select: none; color: var(--muted, #9a9a9a); font-weight: 600; }
 </style>
 </head>
 <body>
@@ -977,6 +980,13 @@
               <span style="display: flex; align-items: center; gap: 10px;">
                 <svg viewBox="0 0 24 24" style="width: 19px; height: 19px; stroke: var(--muted); fill: none; stroke-width: 1.7;"><path d="M4 4h16v16H4z"/><path d="M4 10h16M10 4v16"/></svg>
                 导入备份
+              </span>
+              <span class="meta">›</span>
+            </div>
+            <div class="card flat row-between" style="cursor: pointer;" data-action="clear-all-items">
+              <span style="display: flex; align-items: center; gap: 10px;">
+                <svg viewBox="0 0 24 24" style="width: 19px; height: 19px; stroke: #e35353; fill: none; stroke-width: 1.7;"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg>
+                <span style="color: #e35353;">一键清空物品</span>
               </span>
               <span class="meta">›</span>
             </div>
@@ -1930,6 +1940,38 @@
     setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
     toast('备份已导出：' + name);
   }
+  // 一键清空物品：确认后清空用户物品，恢复默认演示物品（不清成员/位置/家庭名）
+  function clearAllItems() {
+    var total = loadUserItems().length;
+    if (!window.confirm('确定要清空全部物品吗？共 ' + total + ' 件用户物品将被删除。此操作不可撤销（不会清除成员与位置设置）。')) return;
+    saveUserItems([]);
+    saveDeleted([]);
+    mergeUserItemsIntoDetails();
+    renderItemLists();
+    renderReminderCenter();
+    refreshLocationCounts();
+    toast('已清空全部物品');
+  }
+
+  // 导入时按名称去重，避免同名物品重复导致数量虚增
+  function dedupeItems(arr) {
+    var seen = {}, out = [];
+    (arr || []).forEach(function (it) {
+      if (it && it.name && !seen[it.name]) { seen[it.name] = 1; out.push(it); }
+    });
+    return out;
+  }
+
+  // 把不在所给名称清单里的内置演示物品加进“已删除”清单，避免导入后演示物品叠加显示
+  function hideDemosNotIn(keepNames) {
+    keepNames = keepNames || [];
+    var curDel = loadDeleted();
+    DEMO_ITEMS.forEach(function (dm) {
+      if (keepNames.indexOf(dm.name) < 0 && curDel.indexOf(dm.name) < 0) curDel.push(dm.name);
+    });
+    saveDeleted(curDel);
+  }
+
   function importBackup() {
     var input = document.createElement('input');
     input.type = 'file';
@@ -1962,6 +2004,7 @@
             if (family !== '') { try { localStorage.setItem('FAMILY_KEY', family); } catch (e) {} }
             if (members) saveMembers(members);
             items = await compressForImport(items || []);   // 压缩超大照片，控制总大小在配额内
+            items = dedupeItems(items);                     // 按名称去重，防止同名重复
             var okItems = saveUserItems(items);      // 覆盖用户物品（返回是否成功）
             if (!okItems) { toast('导入失败：数据过大，本地存储空间不足，请清理后重试'); cleanup(); return; }
             saveLocations(locs || []);       // 覆盖自定义位置
@@ -1985,12 +2028,14 @@
             toast('导入成功（已覆盖现有数据）');
           } else if (Array.isArray(obj)) {
             // 兼容：整包是个数组，视为用户物品
-            obj = await compressForImport(obj);
+            obj = dedupeItems(await compressForImport(obj));
             if (!saveUserItems(obj)) { toast('导入失败：数据过大，本地存储空间不足，请清理后重试'); cleanup(); return; }
+            hideDemosNotIn(obj.map(function (it) { return it.name; }));
             toast('导入成功（识别为物品清单）');
           } else if (obj.items && Array.isArray(obj.items)) {
-            obj.items = await compressForImport(obj.items);
+            obj.items = dedupeItems(await compressForImport(obj.items));
             if (!saveUserItems(obj.items)) { toast('导入失败：数据过大，本地存储空间不足，请清理后重试'); cleanup(); return; }
+            hideDemosNotIn(obj.items.map(function (it) { return it.name; }));
             if (Array.isArray(obj.members)) saveMembers(obj.members);
             toast('导入成功');
           } else {
@@ -2677,11 +2722,32 @@
         ph.style.color = '';
       }
     }
+    // 无照片时：图片区显示“点击拍照添加”，点击即进入拍照
+    if (ph) {
+      var _ov = ph.querySelector('.dt-photo-add');
+      if (dPhoto) {
+        ph.classList.remove('dt-photo-empty');
+        ph.removeAttribute('data-action');
+        ph.style.cursor = 'default';
+        if (_ov) _ov.remove();
+      } else {
+        ph.classList.add('dt-photo-empty');
+        ph.setAttribute('data-action', 'add-item-photo');
+        ph.style.cursor = 'pointer';
+        if (!_ov) {
+          _ov = document.createElement('div');
+          _ov.className = 'dt-photo-add';
+          _ov.setAttribute('data-action', 'add-item-photo');
+          _ov.innerHTML = '<span style="font-size:36px;line-height:1;">+</span><div style="font-size:13px;margin-top:6px;">点击拍照添加</div>';
+          ph.appendChild(_ov);
+        }
+      }
+    }
   }
 
   /* ── 物品编辑态 ── */
   var _viewingItem = '布洛芬缓释胶囊';
-  var _scanDateItem = null, _scanReturnPage = 'page-home';
+  var _scanDateItem = null, _scanReturnPage = 'page-home', _addPhotoItem = null;
   var CAT_WITH_DATE = { '药品': 1, '食品': 1 };
 
   /* ── 日期快捷步进：快速调年/月，一键回今天 ── */
@@ -2767,6 +2833,14 @@
     var batch = (document.getElementById('ed-batch') ? document.getElementById('ed-batch').textContent.trim() : '') || '—';
     var note = (document.getElementById('ed-note') ? document.getElementById('ed-note').textContent.trim() : '');
     var old = ITEM_DETAILS[_viewingItem] || {};
+    var oldPhoto = old.photo || '';
+    if (!oldPhoto) {
+      // 兑底：详情数据源若缺照片，从已保存用户物品里找回，避免编辑保存时丢图
+      var _u = loadUserItems();
+      for (var _i = 0; _i < _u.length; _i++) {
+        if (_u[_i] && _u[_i].name === _viewingItem && _u[_i].photo) { oldPhoto = _u[_i].photo; break; }
+      }
+    }
     var catEl = document.getElementById('ed-cat');
     var cat = catEl ? catEl.value : '';
     if (!cat) {
@@ -2775,7 +2849,7 @@
       cat = oldCategory || '物品';
     }
     var isDateCat = !!CAT_WITH_DATE[cat];
-    var cur = { name: newName, category: cat, loc: loc, qty: qty, tags: tags, prod: prod, exp: exp, batch: batch, note: note, badge: isDateCat ? (old.badge || 'ok') : 'ok', badgeText: isDateCat ? (old.badgeText || '正常') : '正常', added: (old.meta || '').replace(/^.*添加于\s*/, ''), member: (old.meta || '').match(/@(\w+)/) ? (old.meta.match(/@(\w+)/)[1]) : '1', photo: old.photo || '' };
+    var cur = { name: newName, category: cat, loc: loc, qty: qty, tags: tags, prod: prod, exp: exp, batch: batch, note: note, badge: isDateCat ? (old.badge || 'ok') : 'ok', badgeText: isDateCat ? (old.badgeText || '正常') : '正常', added: (old.meta || '').replace(/^.*添加于\s*/, ''), member: (old.meta || '').match(/@(\w+)/) ? (old.meta.match(/@(\w+)/)[1]) : '1', photo: oldPhoto };
     // 持久化到 localStorage（用户物品 + 演示物品都可编辑保存）
     // 若改名（newName !== 旧名），先把旧名从数据源剔除，旧名加入删除清单，避免刷新后“旧名复活”
     if (newName !== _viewingItem) {
@@ -2871,15 +2945,17 @@
       case 'go-scanning':    inFlow = true; showPage('page-scanning'); break;
       case 'go-scan-confirm': inFlow = true; showPage('page-scan-confirm'); break;
       case 'go-scan-date':   inFlow = true; window.__lastShotDataURL = ''; renderDatePick(); showPage('page-date-pick'); break;
-      case 'go-date-pick-item': inFlow = true; window.__lastShotDataURL = ''; _scanDateItem = el.getAttribute('data-item'); _scanReturnPage = 'page-home'; showPage('page-medicine'); startCamera(); break;
-      case 'go-detail-scan-date': inFlow = true; window.__lastShotDataURL = ''; _scanReturnPage = 'page-detail'; showPage('page-medicine'); startCamera(); break;
+      case 'go-date-pick-item': inFlow = true; window.__lastShotDataURL = ''; _addPhotoItem = null; _scanDateItem = el.getAttribute('data-item'); _scanReturnPage = 'page-home'; setMedicineHeader('date'); showPage('page-medicine'); startCamera(); break;
+      case 'go-detail-scan-date': inFlow = true; window.__lastShotDataURL = ''; _addPhotoItem = null; _scanDateItem = _viewingItem; _scanReturnPage = 'page-detail'; setMedicineHeader('date'); showPage('page-medicine'); startCamera(); break;
       case 'go-date-back':   try { stopCamera(); } catch (e) {} showPage(_scanReturnPage || 'page-home'); break;
-      case 'go-medicine':    inFlow = true; window.__lastShotDataURL = ''; showPage('page-medicine'); startCamera(); break;
+      case 'go-medicine':    inFlow = true; window.__lastShotDataURL = ''; _addPhotoItem = null; _scanDateItem = null; setMedicineHeader('date'); showPage('page-medicine'); startCamera(); break;
+      case 'add-item-photo': inFlow = true; window.__lastShotDataURL = ''; _addPhotoItem = _viewingItem; _scanReturnPage = 'page-detail'; setMedicineHeader('photo'); showPage('page-medicine'); startCamera(); break;
       case 'go-medicine-error': inFlow = true; showPage('page-medicine-error'); break;
       case 'go-medicine-scanning': inFlow = true; showPage('page-medicine-scanning'); break;
       case 'go-medicine-confirm': inFlow = true; showPage('page-medicine-confirm'); break;
       case 'export-backup': exportBackup(); break;
       case 'import-backup': importBackup(); break;
+      case 'clear-all-items': clearAllItems(); break;
       default: break;
     }
   });
@@ -3370,9 +3446,37 @@
   }
 
   /* ── 药品扫描流程 ── */
+  // 相机页标题/提示随模式切换（date=扫日期回填；photo=详情拍照添加）
+  function setMedicineHeader(mode) {
+    var t = document.querySelector('#page-medicine .flow-title');
+    var tip = document.querySelector('#page-medicine .scan-tip');
+    if (mode === 'photo') {
+      if (t) t.textContent = '拍照添加';
+      if (tip) tip.innerHTML = '对准物品拍摄<br><span class="mono">拍摄后自动保存到详情</span>';
+    } else {
+      if (t) t.textContent = '扫描日期';
+      if (tip) tip.innerHTML = '对准包装上的日期区域<br><span class="mono">拍摄后确认日期，回填到物品</span>';
+    }
+  }
   document.getElementById('shutter-med').addEventListener('click', function () {
     var frame = grabFrame();
     window.__lastShotDataURL = frame;
+    // 详情「拍照添加」模式：把照片保存到当前物品并回详情
+    if (_addPhotoItem) {
+      if (!frame) { toast('拍摄失败，请重试'); showPage('page-medicine'); startCamera(); return; }
+      var pName = _viewingItem;
+      var dP = ITEM_DETAILS[pName] || {};
+      var dmP = (dP.meta || '').match(/@(\w+)/);
+      var addedP = ((dP.meta || '').match(/添加于\s*([\d-]+)/) || [])[1] || '';
+      upsertUserItem({ name: pName, category: dP.cat || dP.category || '其他', loc: dP.loc || '未设置', qty: dP.qty || '1', tags: dP.tags || '', badge: dP.badge || 'ok', badgeText: dP.badgeText || '正常', added: addedP, member: (dmP && dmP[1]) || '1', note: dP.note || '', prod: dP.prod || '—', exp: dP.exp || '—', batch: dP.batch || '—', photo: frame });
+      mergeUserItemsIntoDetails();
+      renderItemLists();
+      _addPhotoItem = null;
+      try { stopCamera(); } catch (e) {}
+      _viewingItem = pName; fillDetail(pName); resetDetailEditMode(); showPage('page-detail');
+      toast('已添加照片');
+      return;
+    }
     stopCamera();
     inFlow = true;
     var itemName = _scanDateItem || '物品';
@@ -3405,6 +3509,13 @@
     var locEl = document.getElementById('m-loc');
     if (locEl && locEl.value) loc = locEl.value;
     var d = ITEM_DETAILS[name] || {};
+  var savePhoto = d.photo || '';
+  if (!savePhoto) {
+    var _m = loadUserItems();
+    for (var _mi = 0; _mi < _m.length; _mi++) {
+      if (_m[_mi] && _m[_mi].name === name && _m[_mi].photo) { savePhoto = _m[_mi].photo; break; }
+    }
+  }
     var today = new Date();
     var badge = 'ok', badgeText = '正常';
     if (exp) {
@@ -3424,7 +3535,7 @@
       name: name, category: oldCat,
       loc: loc || d.loc || '未设置', qty: d.qty || '1', tags: d.tags || '',
       badge: badge, badgeText: badgeText, added: dstr, member: member,
-      note: d.note || '', prod: prod, exp: exp, batch: batch, photo: d.photo || ''
+      note: d.note || '', prod: prod, exp: exp, batch: batch, photo: savePhoto || ''
     });
     mergeUserItemsIntoDetails();
     renderItemLists();
