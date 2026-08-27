@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>家庭物品管理系统 · 注册授权系统设计方案</title>
+<style>
+  :root{
+    --bg:#f6f8fb; --card:#fff; --ink:#1c2333; --muted:#6b7688;
+    --brand:#2563eb; --brand2:#0ea5e9; --ok:#0f9d58; --warn:#d97706; --danger:#dc2626;
+    --line:#e6eaf2; --radius:16px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+       background:var(--bg);color:var(--ink);line-height:1.7;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:980px;margin:0 auto;padding:32px 20px 64px}
+  header.top{background:linear-gradient(135deg,#2563eb,#0ea5e9);color:#fff;border-radius:var(--radius);
+             padding:28px 26px 22px;margin-bottom:26px}
+  header.top h1{margin:0 0 6px;font-size:26px;letter-spacing:.5px}
+  header.top p{margin:0;opacity:.92;font-size:14.5px}
+  .pill{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.18);
+        border-radius:999px;padding:4px 12px;font-size:12.5px;margin-right:8px}
+  .pill b{font-weight:600}
+  section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+          padding:24px 26px;margin-bottom:20px}
+  section h2{margin:0 0 6px;font-size:20px}
+  section h2 .num{display:inline-block;width:28px;height:28px;border-radius:9px;background:var(--brand);
+                  color:#fff;text-align:center;line-height:28px;font-size:15px;margin-right:10px}
+  .sub{color:var(--muted);font-size:14px;margin-bottom:18px}
+  table{width:100%;border-collapse:collapse;font-size:14px;margin:14px 0}
+  th,td{padding:10px 12px;border:1px solid var(--line);text-align:left;vertical-align:top}
+  th{background:#f1f5fb;font-weight:600}
+  code{background:#eef2f8;border-radius:5px;padding:2px 7px;font-family:"SFMono-Regular",Consolas,monospace;
+       font-size:13px;color:#0f172a}
+  .mono{font-family:"SFMono-Regular",Consolas,monospace}
+  .step{display:flex;gap:14px;margin:16px 0;position:relative}
+  .step::before{content:"";position:absolute;left:19px;top:44px;bottom:-6px;width:2px;background:var(--line)}
+  .step:last-child::before{display:none}
+  .step .dot{width:40px;height:40px;border-radius:12px;flex:none;display:flex;align-items:center;justify-content:center;
+             background:var(--brand);color:#fff;font-weight:700;font-size:16px}
+  .step .bd{flex:1;padding-top:2px}
+  .step .tt{font-weight:600;font-size:15px}
+  .step .tx{color:#4b5563;font-size:14px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin:18px 0}
+  .metric{background:#f6f9ff;border:1px solid var(--line);border-radius:12px;padding:16px}
+  .metric .k{color:var(--muted);font-size:12.5px}
+  .metric .v{font-weight:700;font-size:19px;margin-top:4px}
+  .metric .d{font-size:12.5px;color:var(--muted);margin-top:4px}
+  .alert{border-radius:12px;padding:16px 18px;margin:16px 0;font-size:14px}
+  .alert.warn{background:#fff7ed;border:1px solid #fed7aa}
+  .alert.ok{background:#ecfdf5;border:1px solid #bbf7d0}
+  .alert .tt{font-weight:700;display:block;margin-bottom:4px}
+  ul.clean{margin:8px 0;padding-left:20px}
+  ul.clean li{margin:6px 0}
+  .badge{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:600}
+  .badge.g{background:#dcfce7;color:#166534}
+  .badge.o{background:#fef3c7;color:#92400e}
+  .foot{color:var(--muted);font-size:13px;text-align:center;margin-top:28px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="top">
+  <h1>家庭物品管理系统 · 注册授权系统</h1>
+  <p>基于「设备特征码 → 离线注册码」的授权方案 · 适用于已打包的 Android APK</p>
+  <div style="margin-top:14px">
+    <span class="pill">离线授权 <b>无需联网</b></span>
+    <span class="pill">试用 <b>2 个月</b></span>
+    <span class="pill">正式 <b>2 年 / 1 次注册</b></span>
+  </div>
+</header>
+
+<section>
+  <h2><span class="num">1</span>核心思路</h2>
+  <p class="sub">一台手机一个「特征码」，你（开发者）用生成器为它签发注册码，App 本地校验到期时间。全程不需要服务器。</p>
+  <div class="step"><div class="dot">1</div><div class="bd">
+    <div class="tt">手机生成「设备特征码」</div>
+    <div class="tx">App 首次启动从设备读取稳定 ID（Android 的 <code>ANDROID_ID</code>），哈希成 16 位十六进制特征码，像 <code class="mono">A3F1-9C2E-7B0D-4E51</code>，显示在「我的」页。</div>
+  </div></div>
+  <div class="step"><div class="dot">2</div><div class="bd">
+    <div class="tt">用户把特征码发给所有者</div>
+    <div class="tx">特征码一机一码，不会变，用微信/电话告知即可。</div>
+  </div></div>
+  <div class="step"><div class="dot">3</div><div class="bd">
+    <div class="tt">所有者用「注册码生成器」签发</div>
+    <div class="tx">填特征码 + 选有效期（默认 2 年 / 试用 2 个月），一键生成注册码。生成器用你的<strong>私密口令</strong>对特征码+到期日做签名。</div>
+  </div></div>
+  <div class="step"><div class="dot">4</div><div class="bd">
+    <div class="tt">用户输入注册码，App 本地校验</div>
+    <div class="tx">App 用同一口令校验签名合法、特征码匹配、日期未过期，通过即解锁正式版。</div>
+  </div></div>
+  <div class="step"><div class="dot">5</div><div class="bd">
+    <div class="tt">到期自动锁定，回到注册引导</div>
+    <div class="tx">试用 2 个月或正式 2 年到期后，App 阻止进入并引导 Renew。</div>
+  </div></div>
+</section>
+
+<section>
+  <h2><span class="num">2</span>注册码怎么构成</h2>
+  <p class="sub">注册码 = 特征码数据 + 到期日期 + 签名校验。结构清晰、可离线验证、不怕被随意修改。</p>
+  <div class="grid">
+    <div class="metric"><div class="k">特征码</div><div class="v mono">16 位 hex</div><div class="d">绑定当前手机</div></div>
+    <div class="metric"><div class="k">到期日</div><div class="v mono">YYYYMMDD</div><div class="d">写入授权时长</div></div>
+    <div class="metric"><div class="k">签名</div><div class="v mono">HMAC-SHA256</div><div class="d">私密口令校验</div></div>
+  </div>
+  <table>
+    <tr><th>组成</th><th>长度</th><th>作用</th></tr>
+    <tr><td>特征码 <code class="mono">A3F1...</code></td><td>16</td><td>保证一码对一机</td></tr>
+    <tr><td>到期日 <code class="mono">20280827</code></td><td>8</td><td>控制授权时长</td></tr>
+    <tr><td>签名 <code class="mono">4c9e...</code></td><td>10</td><td>防伪造 / 防篡改</td></tr>
+  </table>
+  <table>
+    <tr><th>授权类型</th><th>时长</th><th>到期日示例</th><th>说明</th></tr>
+    <tr><td><span class="badge g">试用</span></td><td>2 个月</td><td class="mono">首次启动+60天</td><td>新用户默认，App 自动计算</td></tr>
+    <tr><td><span class="badge g">正式注册</span></td><td>2 年</td><td class="mono">签发日+730天</td><td>一次注册，用满两年</td></tr>
+  </table>
+  <div class="alert ok"><span class="tt">✓ 为什么不用服务器</span>
+    注册码里已内嵌到期日 + 签名，App 断网也能校验。你不用布置后台、不用买域名、不用管短信服务，家里人人都能装。</div>
+</section>
+
+<section>
+  <h2><span class="num">3</span>试用 &amp; 到期逻辑</h2>
+  <div class="step"><div class="dot">1</div><div class="bd"><div class="tt">首次启动</div><div class="tx">生成特征码，并记住“试用开始时间”。</div></div></div>
+  <div class="step"><div class="dot">2</div><div class="bd"><div class="tt">试用期内</div><div class="tx">开箱即用，无需注册；我的页显示“试用 剩余X天”。</div></div></div>
+  <div class="step"><div class="dot">3</div><div class="bd"><div class="tt">试用将满 / 已满</div><div class="tx">到期前 7 天开始提醒；到期后进入注册引导，输入注册码解锁。</div></div></div>
+  <div class="step"><div class="dot">4</div><div class="bd"><div class="tt">正式授权期内</div><div class="tx">显示“已注册 · 有效期至 YYYY-MM-DD”。</div></div></div>
+  <div class="step"><div class="dot">5</div><div class="bd"><div class="tt">正式到期</div><div class="tx">再次进入注册引导，需 Renew 新码。</div></div></div>
+</section>
+
+<section>
+  <h2><span class="num">4</span>安全性说明（客观）</h2>
+  <p class="sub">这是「家用级防盗用」，不是加密软件公司的 DRM。请知悉边界。</p>
+  <table>
+    <tr><th>风险</th><th>是否可行</th><th>说明</th></tr>
+    <tr><td>普通用户复制注册码到另一台手机</td><td><span class="badge g">已被拦截</span></td><td>码里绑了特征码，异机会校验失败</td></tr>
+    <tr><td>改系统日期绕过到期</td><td><span class="badge o">基本防住</span></td><td>启动时额外对比授权时间戳，明显回拨则提示</td></tr>
+    <tr><td>深入逆向 JS 拿到口令伪造</td><td><span class="badge o">无法完全防</span></td><td>客户端程序原则上做不到绝对保密</td></tr>
+    <tr><td>手动改本地存储绕过</td><td><span class="badge o">家用够防</span></td><td>做了基本完整性校验，但不针对动手能力强的用户</td></tr>
+  </table>
+  <div class="alert warn"><span class="tt">⚠ 请注意</span>
+    App 本体是公开分发的，任何人在自己手机上都能拿到这份代码。对家庭自用、内部分发来说，这套方案已经能把「给别人白嫖」挡在门外；但如果要卖给不特定的大众、搞严格防盗版，需要把校验移到你自己的服务器上（不推荐自用场景）。</div>
+</section>
+
+<section>
+  <h2><span class="num">5</span>落地清单</h2>
+  <ul class="clean">
+    <li><strong>离线注册码生成器</strong>（HTML 工具，仅你本地用）—— <span class="badge g">已交付</span></li>
+    <li>App 端：特征码生成 + 注册页 + 试用/到期逻辑 + 校验 —— 需改 <code>index.html</code></li>
+    <li>Capacitor 添加 <code>@capacitor/device</code> 插件，读取硬件 ID —— 需重打包 APK</li>
+    <li>到期提醒 &amp; Renew 引导页</li>
+  </ul>
+</section>
+
+<div class="foot">家庭物品管理系统 · 注册授权系统设计方案 · 由设计专家生成</div>
+</div>
+</body>
+</html>
