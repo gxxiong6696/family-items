@@ -2966,8 +2966,8 @@
     var out = [];
     for (var i = 0; i < list.length; i++) {
       var it = list[i];
-      if (it && it.photo && it.photo.length > 130000) {
-        it.photo = await recompressPhoto(it.photo, 700, 0.5);
+      if (it && it.photo && it.photo.length > 60000) {
+        it.photo = await recompressPhoto(it.photo, 640, 0.5);
       }
       out.push(it);
     }
@@ -3084,8 +3084,8 @@
     var user = loadUserItems();
     var seen = {};
     var result = [];
-    user.forEach(function (it) { if (it && it.name) { if (seen[it.name]) return; seen[it.name] = 1; var cat = it.category || '物品'; var loc = it.loc || '未设置'; if (!it.loc || it.loc === '未设置') { var _d = null; DEMO_ITEMS.some(function (x) { if (x.name === it.name) { _d = x; return true; } return false; }); if (_d && _d.loc) loc = _d.loc; } result.push({ name: it.name, badge: it.badge || 'ok', badgeText: it.badgeText || '正常', meta: it.meta || (it.added ? cat + ' · 添加于 ' + it.added : ''), loc: loc, qty: it.qty || '1', cat: cat }); } });
-    DEMO_ITEMS.forEach(function (d) { if (!seen[d.name] && deleted.indexOf(d.name) < 0) { result.push({ name: d.name, badge: d.badge, badgeText: d.badgeText, meta: d.meta, loc: d.loc, qty: d.qty, cat: d.cat }); } });
+    user.forEach(function (it) { if (it && it.name) { if (seen[it.name]) return; seen[it.name] = 1; var cat = it.category || '物品'; var loc = it.loc || '未设置'; if (!it.loc || it.loc === '未设置') { var _d = null; DEMO_ITEMS.some(function (x) { if (x.name === it.name) { _d = x; return true; } return false; }); if (_d && _d.loc) loc = _d.loc; } result.push({ name: it.name, badge: it.badge || 'ok', badgeText: it.badgeText || '正常', meta: it.meta || (it.added ? cat + ' · 添加于 ' + it.added : ''), loc: loc, qty: it.qty || '1', cat: cat, photo: it.photo || '' }); } });
+    DEMO_ITEMS.forEach(function (d) { if (!seen[d.name] && deleted.indexOf(d.name) < 0) { result.push({ name: d.name, badge: d.badge, badgeText: d.badgeText, meta: d.meta, loc: d.loc, qty: d.qty, cat: d.cat, photo: '' }); } });
     return result;
   }
   function buildItemRow(it) {
@@ -3093,7 +3093,9 @@
     row.className = 'item-row';
     row.setAttribute('data-action', 'go-detail');
     row.setAttribute('data-item', it.name);
-    var icon = '<div class="item-thumb">' + demoIcon(it.name) + '</div>';
+    var icon;
+    if (it.photo) { icon = '<div class="item-thumb" style="background-image:url(' + it.photo + ');background-size:cover;background-position:center;"></div>'; }
+    else { icon = '<div class="item-thumb">' + demoIcon(it.name) + '</div>'; }
     var sub = it.loc || '';
     if (it.qty && it.qty !== '1') sub += ' · ' + it.qty;
     if (!sub) sub = it.meta || '';
