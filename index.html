@@ -538,7 +538,7 @@
               </div>
               <div>
                 <div class="i-name">蓝光眼镜</div>
-                <div class="i-sub">书房 · 书桌抽屉 · 1 件</div>
+                <div class="i-sub">卧室-祥 · 书桌 · 1 件</div>
               </div>
               <span class="badge ok">正常</span>
             </div>
@@ -665,7 +665,7 @@
         <section class="page" id="page-locations" data-od-id="page-locations">
           <div class="header">
             <div>
-              <p class="greeting" data-loc-header>10 个房间 · 29 个收纳位</p>
+              <p class="greeting" data-loc-header>11 个房间 · 32 个收纳位</p>
               <h1>存放位置</h1>
             </div>
             <button class="icon-btn" aria-label="新增位置" data-action="go-add-location">
@@ -794,6 +794,19 @@
                 <div class="loc-child"><span>书桌</span><span class="loc-count">0 件</span></div>
                 <div class="loc-child"><span>书柜</span><span class="loc-count">0 件</span></div>
                 <div class="loc-child"><span>BM柜</span><span class="loc-count">0 件</span></div>
+              </div>
+            </div>
+
+            <div class="loc-node open">
+              <div class="loc-head" data-role="toggle">
+                <svg class="chev" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg>
+                <span style="font-weight: 600; font-size: 14px; flex: 1;">厨房</span>
+                <span class="loc-count">0 件</span>
+              </div>
+              <div class="loc-children">
+                <div class="loc-child"><span>厨柜</span><span class="loc-count">0 件</span></div>
+                <div class="loc-child"><span>碗柜</span><span class="loc-count">0 件</span></div>
+                <div class="loc-child"><span>物品架</span><span class="loc-count">0 件</span></div>
               </div>
             </div>
           </section>
@@ -1848,7 +1861,7 @@
     return [];
   }
   function saveUserItems(arr) {
-    try { localStorage.setItem(ITEMS_KEY, JSON.stringify(arr)); } catch (e) {}
+    try { localStorage.setItem(ITEMS_KEY, JSON.stringify(arr)); return true; } catch (e) { return false; }
   }
   function upsertUserItem(obj) {
     var arr = loadUserItems();
@@ -1866,10 +1879,16 @@
       // 同名只取最新（数组中靠前）一条，防止历史残留的旧条目（旧存放位/数量/效期）反向覆盖新值
       if (it && it.name && !seen[it.name]) {
         seen[it.name] = 1;
+        var base = ITEM_DETAILS[it.name];   // 覆盖前的演示/canonical 记录
+        var loc = it.loc;
+        // 用户记录缺位置或为占位时，沿用演示物品的规范位置，避免“未设置”反向覆盖
+        if (!loc || loc === '未设置') {
+          loc = (base && base.loc && base.loc !== '未设置') ? base.loc : '未设置';
+        }
         ITEM_DETAILS[it.name] = {
           badge: it.badge || 'ok', badgeText: it.badgeText || '正常',
           meta: (it.category || '物品') + ' · 添加于 ' + (it.added || '') + (it.member ? ' · @' + it.member : ''),
-          loc: it.loc || '未设置', qty: it.qty || '1', prod: it.prod || '—', exp: it.exp || '—', batch: it.batch || '—',
+          loc: loc, qty: it.qty || '1', prod: it.prod || '—', exp: it.exp || '—', batch: it.batch || '—',
           tags: it.tags || '', note: it.note || '', photo: it.photo || ''
         };
       }
@@ -1926,7 +1945,7 @@
       var file = input.files && input.files[0];
       if (!file) { cleanup(); return; }
       var reader = new FileReader();
-      reader.onload = function () {
+      reader.onload = async function () {
         try {
           var obj = JSON.parse(reader.result);
           if (!obj || typeof obj !== 'object') { toast('导入失败：无效 JSON'); cleanup(); return; }
@@ -1942,7 +1961,9 @@
 
             if (family !== '') { try { localStorage.setItem('FAMILY_KEY', family); } catch (e) {} }
             if (members) saveMembers(members);
-            saveUserItems(items || []);      // 覆盖用户物品
+            items = await compressForImport(items || []);   // 压缩超大照片，控制总大小在配额内
+            var okItems = saveUserItems(items);      // 覆盖用户物品（返回是否成功）
+            if (!okItems) { toast('导入失败：数据过大，本地存储空间不足，请清理后重试'); cleanup(); return; }
             saveLocations(locs || []);       // 覆盖自定义位置
             saveDeletedLocs(delLocs || []);  // 覆盖已删除位置
             saveLocRenamed(locRens || {});   // 覆盖内置房间改名
@@ -1964,10 +1985,12 @@
             toast('导入成功（已覆盖现有数据）');
           } else if (Array.isArray(obj)) {
             // 兼容：整包是个数组，视为用户物品
-            saveUserItems(obj);
+            obj = await compressForImport(obj);
+            if (!saveUserItems(obj)) { toast('导入失败：数据过大，本地存储空间不足，请清理后重试'); cleanup(); return; }
             toast('导入成功（识别为物品清单）');
           } else if (obj.items && Array.isArray(obj.items)) {
-            saveUserItems(obj.items);
+            obj.items = await compressForImport(obj.items);
+            if (!saveUserItems(obj.items)) { toast('导入失败：数据过大，本地存储空间不足，请清理后重试'); cleanup(); return; }
             if (Array.isArray(obj.members)) saveMembers(obj.members);
             toast('导入成功');
           } else {
@@ -2145,7 +2168,8 @@
     { name: '玄关', children: ['鞋柜', '衣柜'] },
     { name: '储藏室1', children: [] },
     { name: '储藏室2', children: [] },
-    { name: '办公室', children: ['书桌', '书柜', 'BM柜'] }
+    { name: '办公室', children: ['书桌', '书柜', 'BM柜'] },
+    { name: '厨房', children: ['厨柜', '碗柜', '物品架'] }
   ];
   // 是否为内置房间（顶级）
   function isBuiltinRoom(label) { return BUILTIN_ROOMS.some(function (r) { return r.name === label; }); }
@@ -2918,6 +2942,37 @@
     canvas.getContext('2d').drawImage(camVideo, 0, 0, cw, ch);
     return canvas.toDataURL('image/jpeg', 0.6);
   }
+  // 对超大照片做二次压缩（导入/迁移时调用），返回 Promise<dataUrl>，失败则原样返回
+  function recompressPhoto(src, maxW, q) {
+    return new Promise(function (resolve) {
+      if (!src || src.indexOf('data:image') !== 0) { resolve(src || ''); return; }
+      var img = new Image();
+      img.onload = function () {
+        try {
+          var w = img.width, h = img.height;
+          if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
+          var c = document.createElement('canvas');
+          c.width = w; c.height = h;
+          c.getContext('2d').drawImage(img, 0, 0, w, h);
+          resolve(c.toDataURL('image/jpeg', q));
+        } catch (e) { resolve(src); }
+      };
+      img.onerror = function () { resolve(src); };
+      img.src = src;
+    });
+  }
+  // 导入时批量压缩超大照片，避免整套数据顶到 localStorage 配额
+  async function compressForImport(list) {
+    var out = [];
+    for (var i = 0; i < list.length; i++) {
+      var it = list[i];
+      if (it && it.photo && it.photo.length > 130000) {
+        it.photo = await recompressPhoto(it.photo, 700, 0.5);
+      }
+      out.push(it);
+    }
+    return out;
+  }
   // 离开页面/切后台时释放摄像头，避免占用与白屏
   window.addEventListener('pagehide', stopCamera);
   document.addEventListener('visibilitychange', function () { if (document.hidden) stopCamera(); });
@@ -3029,7 +3084,7 @@
     var user = loadUserItems();
     var seen = {};
     var result = [];
-    user.forEach(function (it) { if (it && it.name) { if (seen[it.name]) return; seen[it.name] = 1; var cat = it.category || '物品'; result.push({ name: it.name, badge: it.badge || 'ok', badgeText: it.badgeText || '正常', meta: it.meta || (it.added ? cat + ' · 添加于 ' + it.added : ''), loc: it.loc || '未设置', qty: it.qty || '1', cat: cat }); } });
+    user.forEach(function (it) { if (it && it.name) { if (seen[it.name]) return; seen[it.name] = 1; var cat = it.category || '物品'; var loc = it.loc || '未设置'; if (!it.loc || it.loc === '未设置') { var _d = null; DEMO_ITEMS.some(function (x) { if (x.name === it.name) { _d = x; return true; } return false; }); if (_d && _d.loc) loc = _d.loc; } result.push({ name: it.name, badge: it.badge || 'ok', badgeText: it.badgeText || '正常', meta: it.meta || (it.added ? cat + ' · 添加于 ' + it.added : ''), loc: loc, qty: it.qty || '1', cat: cat }); } });
     DEMO_ITEMS.forEach(function (d) { if (!seen[d.name] && deleted.indexOf(d.name) < 0) { result.push({ name: d.name, badge: d.badge, badgeText: d.badgeText, meta: d.meta, loc: d.loc, qty: d.qty, cat: d.cat }); } });
     return result;
   }
