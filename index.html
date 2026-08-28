@@ -303,6 +303,45 @@
   .loc-del-btn:active { transform: scale(0.92); }
   .loc-child .loc-del-btn { width: 24px; height: 24px; }
 
+  /* ── 位置页 查询/编辑 模式切换 ── */
+  .loc-mode-switch {
+    display: inline-flex; gap: 0; margin: 0 20px 12px; border: 1px solid var(--border);
+    border-radius: 12px; overflow: hidden; background: var(--surface);
+  }
+  .loc-mode-btn {
+    border: 0; background: transparent; padding: 7px 18px; font-size: 13px; font-weight: 600;
+    color: var(--muted); cursor: pointer; transition: background 160ms ease, color 160ms ease;
+  }
+  .loc-mode-btn + .loc-mode-btn { border-left: 1px solid var(--border); }
+  .loc-mode-btn.active { background: var(--accent-soft); color: var(--accent-deep); }
+
+  /* 查询模式：整行高亮暗示可点；编辑/删除按钮隐藏 */
+  #page-locations.loc-mode-query .loc-edit-btn,
+  #page-locations.loc-mode-query .loc-del-btn { display: none; }
+  #page-locations.loc-mode-query .loc-child { color: var(--fg); }
+  #page-locations.loc-mode-query .loc-child:active { background: var(--accent-soft); }
+
+  /* 房间行「查看」入口（仅查询模式显示） */
+  .loc-view-btn {
+    flex: 0 0 auto; border: 0; background: transparent; color: var(--accent);
+    font-size: 12px; font-weight: 600; cursor: pointer; padding: 4px 6px; border-radius: 8px;
+    display: none; align-items: center; gap: 3px;
+  }
+  #page-locations.loc-mode-query .loc-view-btn { display: inline-flex; }
+
+  /* 位置筛选条（物品列表顶部） */
+  .loc-filter-bar {
+    display: none; align-items: center; gap: 8px; margin: 0 20px 10px;
+    background: var(--accent-soft); border: 1px solid color-mix(in oklch, var(--accent) 28%, transparent);
+    border-radius: 12px; padding: 9px 12px; font-size: 13px;
+  }
+  .loc-filter-bar.show { display: flex; }
+  .loc-filter-bar .loc-filter-label { flex: 1; font-weight: 600; color: var(--accent-deep); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .loc-filter-bar .loc-filter-clear {
+    border: 0; background: transparent; color: var(--accent-deep); font-weight: 700;
+    cursor: pointer; padding: 2px 6px; border-radius: 6px; font-size: 13px;
+  }
+
   /* tabbar */
   .tabbar {
     flex: 0 0 auto; display: grid; grid-template-columns: repeat(5, 1fr);
@@ -583,6 +622,11 @@
             </div>
           </section>
 
+          <div class="loc-filter-bar" id="loc-filter-bar">
+            <span class="loc-filter-label" id="loc-filter-label"></span>
+            <button type="button" class="loc-filter-clear" data-action="clear-loc-filter" aria-label="清除位置筛选">✕</button>
+          </div>
+
           <section class="pad" data-od-id="item-list" id="item-list">
             <div class="item-row" data-action="go-detail" data-item="布洛芬缓释胶囊">
               <div class="item-thumb">
@@ -648,7 +692,7 @@
         </section>
 
         <!-- ════════════ P3 位置 ════════════ -->
-        <section class="page" id="page-locations" data-od-id="page-locations">
+        <section class="page loc-mode-query" id="page-locations" data-od-id="page-locations">
           <div class="header">
             <div>
               <p class="greeting" data-loc-header>11 个房间 · 32 个收纳位</p>
@@ -657,6 +701,10 @@
             <button class="icon-btn" aria-label="新增位置" data-action="go-add-location">
               <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
             </button>
+          </div>
+          <div class="loc-mode-switch" role="tablist" aria-label="位置页模式">
+            <button type="button" class="loc-mode-btn active" data-loc-mode="query" aria-selected="true">查询</button>
+            <button type="button" class="loc-mode-btn" data-loc-mode="edit" aria-selected="false">编辑</button>
           </div>
 
           <section class="pad stack" style="gap: 10px;">
@@ -2726,6 +2774,57 @@
     b.innerHTML = svg;
     return b;
   }
+  var LOC_VIEW_SVG = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span>查看</span>';
+  // 给房间头注入「查看」入口（查询态显示）：聚合查看整个房间及其子位的物品
+  function injectLocViewButtons() {
+    document.querySelectorAll('#page-locations .loc-node > .loc-head').forEach(function (headEl) {
+      if (headEl.querySelector('.loc-view-btn')) return;
+      var nameEl = headEl.querySelector('span');
+      var roomName = nameEl ? nameEl.textContent.trim() : '';
+      if (!roomName) return;
+      var b = document.createElement('button');
+      b.className = 'loc-view-btn';
+      b.setAttribute('data-action', 'view-loc-items');
+      b.setAttribute('data-loc', roomName);
+      b.setAttribute('aria-label', '查看「' + roomName + '」的物品');
+      b.title = '查看「' + roomName + '」的物品';
+      b.innerHTML = LOC_VIEW_SVG;
+      var countEl = headEl.querySelector('.loc-count');
+      headEl.insertBefore(b, countEl);
+    });
+  }
+
+  /* ── 位置页 查询/编辑 双模式：默认查询，编辑/删除仅编辑态出现，防误触 ── */
+  function setLocMode(mode) {
+    var page = document.getElementById('page-locations');
+    if (!page) return;
+    page.classList.toggle('loc-mode-query', mode === 'query');
+    page.classList.toggle('loc-mode-edit', mode === 'edit');
+    document.querySelectorAll('#page-locations .loc-mode-btn').forEach(function (b) {
+      var on = b.getAttribute('data-loc-mode') === mode;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+  }
+
+  /* ── 按位置查看物品：设置过滤 → 切到物品页渲染 ── */
+  function viewLocItems(label) {
+    if (!label) return;
+    window._locFilter = label;
+    var bar = document.getElementById('loc-filter-bar');
+    var lab = document.getElementById('loc-filter-label');
+    if (bar && lab) { lab.textContent = '位置：' + label; bar.classList.add('show'); }
+    resetDetailEditMode();
+    showPage('page-items');
+    renderItemLists();
+  }
+  function clearLocFilter() {
+    window._locFilter = null;
+    var bar = document.getElementById('loc-filter-bar');
+    if (bar) bar.classList.remove('show');
+    renderItemLists();
+  }
+
   var LOC_EDIT_SVG = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>';
   var LOC_DEL_SVG = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14"/><path d="M10 11v6M14 11v6"/></svg>';
   // 给位置页的每个房间头/子位置注入「编辑 / 删除」小按钮（静态 + 动态创建均覆盖）
@@ -3070,9 +3169,27 @@
     var el = e.target.closest('[data-action], [data-toast], [data-tab], [data-role="toggle"], [data-role="loc"]');
     if (!el) return;
 
+    if (el.hasAttribute('data-loc-mode')) {
+      setLocMode(el.getAttribute('data-loc-mode'));
+      return;
+    }
     if (el.hasAttribute('data-role') && el.getAttribute('data-role') === 'toggle') {
       el.closest('.loc-node').classList.toggle('open');
       return;
+    }
+
+    // 查询模式：点收纳位行 = 查看该位置物品（编辑模式不拦截，走编辑/删除按钮）
+    var pageLoc = document.getElementById('page-locations');
+    if (pageLoc && pageLoc.classList.contains('loc-mode-query') && el.classList && el.classList.contains('loc-child')) {
+      var subEl = el.querySelector('span');
+      var headEl = el.closest('.loc-node') ? el.closest('.loc-node').querySelector('.loc-head span') : null;
+      // 备注类子行（计数为 “—”）不可点
+      var cEl = el.querySelector('.loc-count');
+      var isNote = cEl && cEl.textContent.trim() === '—';
+      if (subEl && headEl && !isNote) {
+        viewLocItems(headEl.textContent.trim() + ' · ' + subEl.textContent.trim());
+        return;
+      }
     }
 
     if (el.hasAttribute('data-tab')) {
@@ -3092,6 +3209,9 @@
       case 'go-home':        goHome(); break;
       case 'go-items':       resetDetailEditMode(); showPage('page-items'); break;
       case 'go-locations':   showPage('page-locations'); break;
+      case 'view-loc-items': viewLocItems(el.getAttribute('data-loc')); break;
+      case 'clear-loc-filter': clearLocFilter(); break;
+
       case 'go-reminders':   showPage('page-reminders'); break;
       case 'go-profile':     showPage('page-profile'); break;
       case 'go-detail':
@@ -3414,8 +3534,13 @@
       listEl.innerHTML = '';
       var catFilter = window._catFilter || 'all';
       var kw = (window._searchKw || '').toLowerCase();
+      var locFilter = window._locFilter || '';
       var shown = items;
-      if (catFilter && catFilter !== 'all') shown = items.filter(function (it) { return normalizeCat(it.cat || it.category) === catFilter; });
+      if (locFilter) shown = shown.filter(function (it) {
+        var loc = (it.loc || '').trim();
+        return loc === locFilter || loc.indexOf(locFilter + ' · ') === 0;
+      });
+      if (catFilter && catFilter !== 'all') shown = shown.filter(function (it) { return normalizeCat(it.cat || it.category) === catFilter; });
       if (kw) shown = shown.filter(function (it) {
         var catName = normalizeCat(it.cat || it.category);
         var hayBase = ((it.name || '') + ' ' + (it.loc || '') + ' ' + (it.qty || '') + ' ' + (it.meta || '') + ' ' + catName).toLowerCase();
@@ -3425,7 +3550,7 @@
       if (!shown.length) {
         var empty = document.createElement('div');
         empty.className = 'empty-hint';
-        empty.textContent = (catFilter && catFilter !== 'all') && !kw ? '该类别暂无物品' : '未找到匹配的物品';
+        empty.textContent = locFilter ? '该位置暂无物品' : ((catFilter && catFilter !== 'all') && !kw ? '该类别暂无物品' : '未找到匹配的物品');
         listEl.appendChild(empty);
       } else {
         shown.forEach(function (it) { listEl.appendChild(buildItemRow(it)); });
@@ -3520,6 +3645,7 @@
   function refreshItemStatsAll() {
     refreshItemStats();
     refreshLocationCounts();
+    injectLocViewButtons();
   }
 
   /* ── 药品临期雷达 + 提醒中心：数据驱动渲染（随删除/新增/编辑同步刷新） ── */
@@ -4015,7 +4141,7 @@
   }
 
   /* ═══════════ 关于本软件 ═══════════ */
-  var APP_VERSION = '7.3';
+  var APP_VERSION = '8.0';
   var APP_AUTHOR = 'Peter.Xiong';
   var APP_MAKER = '智普 AutoClaw 的设计专家系统';
   var APP_DESC = '本软件由 ' + APP_AUTHOR + ' 利用 ' + APP_MAKER + ' 设计。用于家庭物品管理，如有问题和建议或希望长期使用，请与 Peterx 联系：peterx@qq.com。';
@@ -4055,6 +4181,8 @@
   restoreLocations();
   initDateSteppers();
   updateHomeGreeting();
+  injectLocViewButtons();
+  setLocMode('query');
   renderItemLists();
   renderReminderCenter();
   refreshItemStatsAll();

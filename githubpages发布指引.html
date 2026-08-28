@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>GitHub Pages 发布指引 · 家庭物品管理系统</title>
+<style>
+  :root {
+    --bg:#F6F3EC; --surface:#FFFFFF; --fg:#2A2A26; --muted:#8A857B;
+    --border:#E8E3D9; --accent:#46613F; --accent-soft:#5F7F5A; --warn:#C08A2D; --danger:#C94F4F;
+    --font-display:'Songti SC','Noto Serif SC','STSong','SimSun',serif;
+    --font-body:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei','Segoe UI',sans-serif;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:var(--font-body); background:var(--bg); color:var(--fg); line-height:1.75; padding:44px 20px 70px; }
+  .wrap { max-width:980px; margin:0 auto; }
+  h1 { font-family:var(--font-display); font-size:32px; font-weight:600; letter-spacing:.5px; margin-bottom:8px; }
+  .lead { color:var(--muted); font-size:15px; margin-bottom:28px; }
+  h2 { font-family:var(--font-display); font-size:22px; font-weight:600; margin:36px 0 14px; padding-left:12px; border-left:4px solid var(--accent); }
+  h3 { font-size:15px; font-weight:600; margin:16px 0 8px; }
+  .card { background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:22px 24px; margin:12px 0; }
+  .dir { background:#2A2A26; color:#E8E3D9; border-radius:12px; padding:18px 20px; font-family:ui-monospace,Consolas,monospace; font-size:13px; overflow:auto; margin:12px 0; white-space:pre; }
+  .step { display:flex; gap:14px; margin:14px 0; }
+  .step .n { flex:0 0 32px; height:32px; border-radius:50%; background:var(--accent); color:#fff; font-weight:600; display:flex; align-items:center; justify-content:center; font-size:15px; }
+  .step .b { flex:1; }
+  .step .t { font-weight:600; margin-bottom:2px; }
+  .step .d { color:#4a4a44; font-size:14px; }
+  code { background:#F0EDE5; border:1px solid var(--border); border-radius:6px; padding:2px 7px; font-size:13px; font-family:ui-monospace,Consolas,monospace; color:var(--accent); }
+  .urlbox { background:color-mix(in oklch,var(--accent-soft) 12%,transparent); border:1px dashed var(--accent-soft); border-radius:12px; padding:16px 20px; margin:12px 0; font-family:ui-monospace,Consolas,monospace; font-size:15px; font-weight:600; color:var(--accent); }
+  .tag { display:inline-block; background:color-mix(in oklch,var(--accent-soft) 14%,transparent); color:var(--accent); border-radius:20px; padding:2px 10px; font-size:12px; font-weight:600; margin-right:6px; }
+  .tag.opt { background:color-mix(in oklch,var(--warn) 14%,transparent); color:var(--warn); }
+  .warnbox { background:color-mix(in oklch,var(--warn) 12%,transparent); border-left:4px solid var(--warn); border-radius:10px; padding:14px 18px; margin:14px 0; font-size:14px; }
+  .dangerbox { background:color-mix(in oklch,var(--danger) 10%,transparent); border-left:4px solid var(--danger); border-radius:10px; padding:14px 18px; margin:14px 0; font-size:14px; }
+  .okbox { background:color-mix(in oklch,var(--accent-soft) 10%,transparent); border-left:4px solid var(--accent-soft); border-radius:10px; padding:14px 18px; margin:14px 0; font-size:14px; }
+  table { width:100%; border-collapse:collapse; margin:14px 0; background:var(--surface); border-radius:12px; overflow:hidden; }
+  th,td { text-align:left; padding:12px 14px; border-bottom:1px solid var(--border); font-size:14px; vertical-align:top; }
+  th { background:color-mix(in oklch,var(--accent-soft) 10%,transparent); font-weight:600; }
+  tr:last-child td { border-bottom:none; }
+  .check { display:flex; gap:10px; align-items:flex-start; margin:10px 0; }
+  .check .dot { flex:0 0 22px; height:22px; border-radius:50%; background:var(--accent-soft); color:#fff; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:600; }
+  .check .txt { flex:1; font-size:14px; }
+  .foot { margin-top:40px; color:var(--muted); font-size:13px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>用 GitHub Pages 发布「家庭物品管理系统」</h1>
+  <p class="lead">免费、自带 HTTPS、支持 PWA 安装。你的项目已用「相对路径 + .json 清单」，可直接托管，无需改代码。</p>
+
+  <h2>一、先看结论</h2>
+  <div class="okbox">
+    <strong>好消息：</strong>你的项目所有资源引用都是<strong>相对路径</strong>（<code>./</code> 开头），没有以 <code>/</code> 开头的绝对路径。所以无论 GitHub 把它放在根路径还是子路径，都能正常加载，<strong>不需要改任何代码</strong>。
+    <div style="margin-top:10px;">
+      <span class="tag">推荐：子路径</span> 直接用现有仓库部署，最省事、零迁移成本。<span class="tag opt">可选：根路径</span> 想要更短的网址 <code>https://你.github.io/</code> 时才需要（见下方选择）。
+    </div>
+  </div>
+  <p style="font-size:13px;color:var(--muted);">说明：PWA 的「全屏 + 离线 + 添加到主屏」与是否根路径<strong>没有关系</strong>，只取决于 HTTPS + 清单 + 图标齐全。子路径完全够用。</p>
+
+  <h2>二、两种方式怎么选</h2>
+  <table>
+    <tr><th>方式</th><th>仓库名</th><th>访问地址</th><th>适合场景</th></tr>
+    <tr><td><strong>子路径（推荐）</strong></td><td>任意名称（如 family-items）</td><td><code>https://你.github.io/family-items/</code></td><td>直接用一个普通仓库部署，最简单；访问<strong>务必带末尾斜杠 /</strong></td></tr>
+    <tr><td>根路径（可选）</td><td>必须精确等于<code>你.github.io</code></td><td><code>https://你.github.io/</code></td><td>想要很短的网址、或当个人主站时才用；<strong>每个账号只能有 1 个</strong></td></tr>
+  </table>
+  <div class="warnbox">如果你已经建好了仓库，直接走「子路径」即可，不用新建。只有确实想用 <code>https://你.github.io/</code> 这么短的网址，才专门建一个名为 <code>你.github.io</code> 的仓库（账号里只能有这一个）。</div>
+
+  <h2>三、上传文件（网页直接传，不用命令行）</h2>
+  <div class="card">
+    <div class="step"><div class="n">1</div><div class="b"><div class="t">新建仓库</div><div class="d">登录 GitHub → 右上角 <code>+</code> → New repository → 填仓库名（建议 <code>family-items</code>）→ 选 <strong>Public</strong>（公开）→ Create repository。</div></div></div>
+    <div class="step"><div class="n">2</div><div class="b"><div class="t">上传根目录三个文件</div><div class="d">仓库里点 <strong>Add file → Upload files</strong>，把 <code>index.html</code>、<code>manifest.json</code>、<code>sw.js</code>、<code>.nojekyll</code> 一起拖进上传区 → Commit changes。</div></div></div>
+    <div class="step"><div class="n">3</div><div class="b"><div class="t">上传 icons 图标（关键）</div><div class="d">网页整文件夹拖放<strong>不稳定</strong>。最可靠做法：点 <strong>Add file → Create new file</strong>，文件名直接输入路径前缀：<code>icons/icon-192.png</code> → 粘贴文件内容 → Commit。对每个图标文件都这样建一次（<code>icons/</code> 会被自动创建）。</div></div></div>
+    <div class="step"><div class="n">4</div><div class="b"><div class="t">启用 Pages</div><div class="d">仓库 <strong>Settings → Pages</strong> → Source 选 <strong>Deploy from a branch</strong> → Branch 选 <code>main</code>、目录选 <code>/(root)</code> → <strong>Save</strong>。</div></div></div>
+    <div class="step"><div class="n">5</div><div class="b"><div class="t">等上线</div><div class="d">首次约 1-5 分钟，页面顶部出现 <code>Your site is published at …</code>，即你的正式地址。</div></div></div>
+  </div>
+  <div class="card">
+    <h3>备选：git 命令行（更专业，可选）</h3>
+    <div class="dir"># 在本地 PWA 文件夹内执行
+git init
+git add .
+git commit -m "发布家庭物品管理系统 PWA"
+git branch -M main
+git remote add origin https://github.com/你的用户名/family-items.git
+git push -u origin main
+# 然后同样到 Settings → Pages 启用</div>
+    <p style="font-size:13px;color:var(--muted);margin-top:8px;">没装 git 就直接用上面的网页方式，功能完全一致。</p>
+  </div>
+
+  <h2>四、上传内容清单</h2>
+  <div class="dir">PWA 家庭物品管理系统/
+├─ index.html               应用入口（主界面 + 快捷路由）
+├─ manifest.json            应用清单（.json 后缀，浏览器按 application/json 识别）
+├─ sw.js                    Service Worker（离线缓存）
+├─ .nojekyll                禁用 Jekyll（保护 PWA 资产，显式采用）
+└─ icons/
+   ├─ icon-192.png          安装图标 192×192
+   ├─ icon-512.png          安装图标 512×512
+   ├─ icon-maskable-512.png 自适应图标（安卓动态图标）
+   └─ apple-touch-icon.png  iOS 主屏图标 180×180</div>
+
+  <h2>五、在手机上安装为 App</h2>
+  <div class="card">
+    <div class="step"><div class="n">1</div><div class="b"><div class="t">安卓（Chrome / Edge）</div><div class="d">用浏览器打开部署链接，首次加载后底部或菜单提示「添加至主屏幕 / 安装应用」；也可点菜单 ⋮ → 添加至主屏幕。</div></div></div>
+    <div class="step"><div class="n">2</div><div class="b"><div class="t">iPhone（Safari）</div><div class="d">点分享 <strong>↑</strong> → 向下找「添加到主屏幕」→ 点「添加」。</div></div></div>
+    <div class="step"><div class="n">3</div><div class="b"><div class="t">启动</div><div class="d">点主屏图标全屏运行，离线也能打开已缓存界面（首次需联网加载一次）。</div></div></div>
+  </div>
+
+  <h2>六、⚠️ 常见坑与注意</h2>
+  <div class="dangerbox">
+    <strong>1. 改了没效果 / 删不掉？</strong>这是 Service Worker 缓存 + 浏览器约 24h 更新周期。已升级缓存 v2 并做网络优先。发布后<strong>手机上第一次彻底打开、再关掉重开</strong>；若仍旧，强制刷新或清一次站点数据。
+    <strong>2. 子路径访问务必带尾斜杠</strong>：用 <code>…/family-items/</code>（末尾有 /），否则相对路径会解析错、资源 404。
+    <strong>3. 文件名大小写敏感</strong>：GitHub/Linux 区分大小写。Windows 本地不区分，上传后引用路径的大小写必须与文件名完全一致（尤其 <code>icon-192.png</code> / <code>apple-touch-icon.png</code>）。
+    <strong>4. 部署生效有延迟</strong>：push 后 GitHub 构建 + CDN 同步，最坏约 20 分钟，别着急误以为失败。
+    <strong>5. 仓库名别用特殊结尾</strong>：避免以 <code>.</code> 或 <code>-</code> 结尾即可（官方只明文禁止以 <code>.git</code> 结尾）。
+  </div>
+
+  <h2>七、发布前自检</h2>
+  <div class="card">
+    <div class="check"><div class="dot">✓</div><div class="txt">整个项目（含 icons/ 子目录和 <code>.nojekyll</code>）都上传，缺一不可</div></div>
+    <div class="check"><div class="dot">✓</div><div class="txt">容器/仓库名全小写，引用路径与文件名大小写完全一致</div></div>
+    <div class="check"><div class="dot">✓</div><div class="txt">得到以 <code>https://</code> 开头的链接（GitHub Pages 强制 HTTPS）</div></div>
+    <div class="check"><div class="dot">✓</div><div class="txt">手机访问用带尾斜杠的完整地址</div></div>
+    <div class="check"><div class="dot">✓</div><div class="txt">手机打开后出现「添加至主屏幕」（安卓）或能通过分享添加（iPhone）</div></div>
+    <div class="check"><div class="dot">✓</div><div class="txt">点主屏图标全屏打开，开飞行模式仍能看到已缓存界面</div></div>
+  </div>
+
+  <h2>八、以后如何更新</h2>
+  <div class="card">
+    <p>改完本地文件后，用网页在仓库里 <strong>Add file → Upload files</strong> 重新拖入覆盖同名文件，或 git push 到 <code>main</code>。GitHub 会自动重新部署，等构建完手机重开应用即拿到新版。</p>
+    <p style="font-size:13px;color:var(--muted);">注意：若改动涉及 Service Worker 缓存策略，建议同步递增 <code>sw.js</code> 里的缓存版本号，确保手机拿到新逻辑。</p>
+  </div>
+
+  <div class="foot">家庭物品管理系统 · GitHub Pages 发布指引 · 视觉规范 #F6F3EC / #5F7F5A</div>
+</div>
+</body>
+</html>
