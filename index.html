@@ -443,7 +443,7 @@
         <section class="page active" id="page-home" data-od-id="page-home">
           <div class="header">
             <div>
-              <p class="greeting">8月23日 · 周日 · 家中</p>
+              <p class="greeting" id="home-date-greet"></p>
               <h1>家庭物品管理系统</h1>
             </div>
             <button class="icon-btn" aria-label="搜索" data-action="go-items">
@@ -3400,6 +3400,14 @@
     }
     return out.toLowerCase();
   }
+  // 首页问候：显示真实当天日期与星期（去除硬编码的问候日期与地点）
+  function updateHomeGreeting() {
+    var el = document.getElementById('home-date-greet');
+    if (!el) return;
+    var d = new Date();
+    var week = ['周日','周一','周二','周三','周四','周五','周六'][d.getDay()];
+    el.textContent = (d.getMonth() + 1) + '月' + d.getDate() + '日 · ' + week;
+  }
   function renderItemLists() {    var items = getAllItems();
     var listEl = document.getElementById('item-list');
     if (listEl) {
@@ -4007,7 +4015,7 @@
   }
 
   /* ═══════════ 关于本软件 ═══════════ */
-  var APP_VERSION = '7.2';
+  var APP_VERSION = '7.3';
   var APP_AUTHOR = 'Peter.Xiong';
   var APP_MAKER = '智普 AutoClaw 的设计专家系统';
   var APP_DESC = '本软件由 ' + APP_AUTHOR + ' 利用 ' + APP_MAKER + ' 设计。用于家庭物品管理，如有问题和建议或希望长期使用，请与 Peterx 联系：peterx@qq.com。';
@@ -4046,6 +4054,7 @@
   ensureLocSelects();
   restoreLocations();
   initDateSteppers();
+  updateHomeGreeting();
   renderItemLists();
   renderReminderCenter();
   refreshItemStatsAll();
