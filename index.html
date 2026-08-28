@@ -971,17 +971,17 @@
               </span>
               <span class="meta">›</span>
             </div>
-            <div class="card flat row-between" style="cursor: pointer;" data-action="export-backup" data-toast="备份已导出">
+            <div class="card flat row-between" style="cursor: pointer;" data-action="export-backup" data-toast="加密备份已导出">
               <span style="display: flex; align-items: center; gap: 10px;">
                 <svg viewBox="0 0 24 24" style="width: 19px; height: 19px; stroke: var(--muted); fill: none; stroke-width: 1.7;"><path d="M4 4h16v16H4z"/><path d="M4 10h16M10 4v16"/></svg>
-                导出备份
+                导出加密备份
               </span>
               <span class="meta">›</span>
             </div>
             <div class="card flat row-between" style="cursor: pointer;" data-action="import-backup">
               <span style="display: flex; align-items: center; gap: 10px;">
                 <svg viewBox="0 0 24 24" style="width: 19px; height: 19px; stroke: var(--muted); fill: none; stroke-width: 1.7;"><path d="M4 4h16v16H4z"/><path d="M4 10h16M10 4v16"/></svg>
-                导入备份
+                导入备份（自动识别）
               </span>
               <span class="meta">›</span>
             </div>
@@ -1914,13 +1914,152 @@
     });
   }
 
-  /* ── 数据备份：导出 / 导入（纯本地，下载 JSON / 读取 JSON） ── */
+  /* ── 数据备份：导出 / 导入（纯本地；导出加密 / 导入自动识别加密或明文） ── */
   var BACKUP_META = {
     app: 'family-items',
     version: 1,
     exportedAt: ''
   };
+  // ====== V6.0 备份加密（用户名+密码 → PBKDF2 → AES-256-GCM）======
+  var BK_MAGIC = [0x46, 0x49, 0x42, 0x4B];  // "FIBK"
+  var BK_VERSION = 1;
+  var OWNER_KEY = 'family-items-owner';
+  function b64ToBytes(b64){ var bin = atob(b64); var out = new Uint8Array(bin.length); for (var i=0;i<bin.length;i++) out[i] = bin.charCodeAt(i); return out; }
+  function bytesToB64(bytes){ var s=''; for (var i=0;i<bytes.length;i++) s += String.fromCharCode(bytes[i]); return btoa(s); }
+  function strToBytes(str){ return new TextEncoder().encode(str); }
+  function bytesToStr(bytes){ return new TextDecoder('utf-8').decode(bytes); }
+  function backKey(user, pass, salt){
+    var passphrase = new TextEncoder().encode((user||'') + '|' + (pass||''));
+    return crypto.subtle.importKey('raw', passphrase, {name:'PBKDF2'}, false, ['deriveKey']).then(function(base){
+      return crypto.subtle.deriveKey(
+        {name:'PBKDF2', salt:salt, iterations:100000, hash:'SHA-256'},
+        base, {name:'AES-GCM', length:256}, false, ['encrypt','decrypt']);
+    });
+  }
+  function encryptBackup(user, pass, json){
+    var salt = crypto.getRandomValues(new Uint8Array(16));
+    var iv = crypto.getRandomValues(new Uint8Array(12));
+    return backKey(user, pass, salt).then(function(key){
+      return crypto.subtle.encrypt({name:'AES-GCM', iv:iv}, key, strToBytes(json)).then(function(ct){
+        var u = strToBytes(user || '');
+        var head = new Uint8Array(35 + u.length);
+        head[0]=BK_MAGIC[0]; head[1]=BK_MAGIC[1]; head[2]=BK_MAGIC[2]; head[3]=BK_MAGIC[3]; head[4]=BK_VERSION;
+        head.set(salt, 5); head.set(iv, 21);
+        head[33]=(u.length>>8)&0xff; head[34]=u.length&0xff;
+        head.set(u, 35);
+        var out = new Uint8Array(head.length + ct.byteLength);
+        out.set(head, 0); out.set(new Uint8Array(ct), head.length);
+        return out;
+      });
+    });
+  }
+  function parseBackup(bytes){
+    if (!bytes || bytes.length < 35) return null;
+    if (!(bytes[0]===BK_MAGIC[0]&&bytes[1]===BK_MAGIC[1]&&bytes[2]===BK_MAGIC[2]&&bytes[3]===BK_MAGIC[3])) return null;
+    var salt = bytes.slice(5,21), iv = bytes.slice(21,33);
+    var ulen = (bytes[33]<<8) | bytes[34];
+    if (35 + ulen > bytes.length) return null;
+    var u = bytesToStr(bytes.slice(35, 35+ulen));
+    var ct = bytes.slice(35+ulen);
+    return { ver: bytes[4], salt: salt, iv: iv, username: u, ct: ct };
+  }
+  function decryptBackup(p, pass){
+    return backKey(p.username, pass, p.salt).then(function(key){
+      return crypto.subtle.decrypt({name:'AES-GCM', iv:p.iv}, key, p.ct).then(function(pt){
+        return bytesToStr(new Uint8Array(pt));
+      });
+    });
+  }
+  function setOwner(name){ if(!name) return; try{ localStorage.setItem(OWNER_KEY, name); }catch(e){} }
+  function askBackupCreds(opts, cb){
+    var ov = document.createElement('div');
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:9999;';
+    var box = document.createElement('div');
+    box.style.cssText = 'background:#fff;border-radius:16px;padding:24px 22px;width:min(92vw,400px);box-shadow:0 12px 40px rgba(0,0,0,.3);color:#1c2333;';
+    function mk(l){ var x=document.createElement('label'); x.style.cssText='display:block;font-size:13px;font-weight:600;margin:12px 0 6px;color:#374151;'; x.textContent=l; return x; }
+    function inp(type){ var i=document.createElement('input'); i.type=type||'text'; i.style.cssText='width:100%;padding:11px 13px;border:1px solid #e6eaf2;border-radius:10px;font-size:15px;box-sizing:border-box;'; return i; }
+    var title=document.createElement('div'); title.style.cssText='font-size:17px;font-weight:700;margin:0 0 4px;'; title.textContent=opts.title; box.appendChild(title);
+    var userInp=null, passInp=null, pass2Inp=null, msg=null;
+    if (opts.readonlyUser){
+      box.appendChild(mk('备份归属'));
+      var rd=document.createElement('div'); rd.style.cssText='padding:11px 13px;background:#f1f5fb;border-radius:10px;font-size:14px;font-weight:600;color:#1c2333;'; rd.textContent=opts.readonlyUser; box.appendChild(rd);
+    } else if (opts.showUser){
+      box.appendChild(mk('用户名'));
+      userInp = inp('text'); userInp.value = opts.prefillUser || ''; box.appendChild(userInp);
+    }
+    box.appendChild(mk('密码'));
+    passInp = inp('password'); box.appendChild(passInp);
+    if (opts.confirm){
+      box.appendChild(mk('确认密码'));
+      pass2Inp = inp('password'); box.appendChild(pass2Inp);
+    }
+    var tip=document.createElement('div'); tip.style.cssText='font-size:12px;color:#6b7688;margin:10px 0 0;'; tip.textContent=opts.tip||''; box.appendChild(tip);
+    msg=document.createElement('div'); msg.style.cssText='font-size:12.5px;margin:8px 0 0;color:#dc2626;min-height:18px;'; box.appendChild(msg);
+    var btns=document.createElement('div'); btns.style.cssText='display:flex;gap:10px;margin-top:16px;';
+    var ok=document.createElement('button'); ok.textContent='确定'; ok.style.cssText='flex:1;padding:12px;border:none;border-radius:10px;background:#2563eb;color:#fff;font-size:14px;font-weight:600;';
+    var cc=document.createElement('button'); cc.textContent='取消'; cc.style.cssText='flex:1;padding:12px;border:none;border-radius:10px;background:#eef2f8;color:#3b4252;font-size:14px;font-weight:600;';
+    btns.appendChild(ok); btns.appendChild(cc); box.appendChild(btns); ov.appendChild(box); document.body.appendChild(ov);
+    function close(){ if(ov.parentNode) ov.parentNode.removeChild(ov); }
+    function doOk(){
+      var u = opts.readonlyUser ? opts.readonlyUser : (userInp ? userInp.value.trim() : '');
+      var p = passInp.value;
+      if (!opts.readonlyUser && opts.showUser && !u){ msg.textContent='请输入用户名'; return; }
+      if (!p){ msg.textContent='请输入密码'; return; }
+      if (opts.confirm && p!==pass2Inp.value){ msg.textContent='两次输入的密码不一致'; return; }
+      close(); cb(u, p);
+    }
+    ok.onclick=doOk; cc.onclick=function(){ close(); cb(null,null); };
+    ov.onclick=function(e){ if(e.target===ov){ close(); cb(null,null); } };
+    passInp.addEventListener('keydown',function(e){ if(e.key==='Enter') doOk(); });
+    if (pass2Inp) pass2Inp.addEventListener('keydown',function(e){ if(e.key==='Enter') doOk(); });
+  }
+
+  async function handleBackupApply(obj, after) {
+    try {
+      if (obj && obj.__meta && obj.__meta.app === 'family-items') {
+        var family = (obj.familyName != null) ? obj.familyName : '';
+        var members = Array.isArray(obj.members) ? obj.members : null;
+        var items = Array.isArray(obj.items) ? obj.items : null;
+        var locs = Array.isArray(obj.locations) ? obj.locations : null;
+        var delItems = Array.isArray(obj.deletedItems) ? obj.deletedItems : null;
+        var delLocs = Array.isArray(obj.deletedLocs) ? obj.deletedLocs : null;
+        var locRens = (obj.locRenames && typeof obj.locRenames === 'object') ? obj.locRenames : null;
+        if (family !== '') { try { localStorage.setItem('FAMILY_KEY', family); } catch (e) {} }
+        if (members) saveMembers(members);
+        items = await compressForImport(items || []);
+        items = dedupeItems(items);
+        if (!saveUserItems(items)) { toast('导入失败：数据过大，本地存储空间不足，请清理后重试'); return false; }
+        saveLocations(locs || []); saveDeletedLocs(delLocs || []); saveLocRenamed(locRens || {});
+        var keep = (items || []).map(function (it) { return it.name; });
+        var del = (delItems || []).slice();
+        DEMO_ITEMS.forEach(function (dm) { if (keep.indexOf(dm.name) < 0 && del.indexOf(dm.name) < 0) del.push(dm.name); });
+        saveDeleted(del);
+        toast('导入成功（已覆盖现有数据）');
+      } else if (Array.isArray(obj)) {
+        obj = dedupeItems(await compressForImport(obj));
+        if (!saveUserItems(obj)) { toast('导入失败：数据过大，本地存储空间不足，请清理后重试'); return false; }
+        hideDemosNotIn(obj.map(function (it) { return it.name; }));
+        toast('导入成功（识别为物品清单）');
+      } else if (obj.items && Array.isArray(obj.items)) {
+        obj.items = dedupeItems(await compressForImport(obj.items));
+        if (!saveUserItems(obj.items)) { toast('导入失败：数据过大，本地存储空间不足，请清理后重试'); return false; }
+        hideDemosNotIn(obj.items.map(function (it) { return it.name; }));
+        if (Array.isArray(obj.members)) saveMembers(obj.members);
+        toast('导入成功');
+      } else {
+        toast('导入失败：文件结构无法识别'); return false;
+      }
+      mergeUserItemsIntoDetails(); renderItemLists(); renderReminderCenter(); renderMembers(); renderFamily(); renderSelfCard();
+      if (typeof after === 'function') after();
+      return true;
+    } catch (e) {
+      toast('导入失败：' + (e && e.message ? e.message : '解析错误'));
+      return false;
+    }
+  }
+
   function exportBackup() {
+    if (!crypto || !crypto.subtle) { toast('当前环境不支持加密，无法导出加密备份，请升级到 V6.0 以上'); return; }
     var members = loadMembers();
     var items = loadUserItems();
     var family = null;
@@ -1936,36 +2075,38 @@
       locRenames: loadLocRenamed()
     };
     var json = JSON.stringify(payload, null, 2);
-    var d = new Date();
-    var name = 'family-items-backup-' + d.getFullYear() + ('0' + (d.getMonth() + 1)).slice(-2) + ('0' + d.getDate()).slice(-2) + '.json';
-    // 原生 APK（Capacitor WebView）没有下载处理器，Blob 下载会静默失败；改走文件系统 + 系统分享
-    if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) {
-      var cp = window.Capacitor.Plugins;
-      if (cp && cp.Filesystem && cp.Share) {
-        cp.Filesystem.writeFile({ path: name, data: json, directory: 'CACHE', encoding: 'utf8' })
-          .then(function (res) {
-            return cp.Filesystem.readFile({ path: name, directory: 'CACHE', encoding: 'utf8' })
-              .then(function (r) {
-                var got = (r && r.data) || '';
-                if (got.length < json.length) { throw new Error('写入不完整 (' + got.length + '/' + json.length + ' 字符)'); }
-                return cp.Share.share({ title: '家庭物品管理系统 备份', files: [res.uri] });
-              });
-          })
-          .then(function () { toast('备份已生成：' + name); })
-          .catch(function (e) { toast('导出失败：' + (e && e.message || '未知错误')); });
-        return;
-      }
-    }
-    var blob = new Blob([json], { type: 'application/json;charset=utf-8' });
-    var url = URL.createObjectURL(blob);
-    var a = document.createElement('a');
-    a.href = url;
-    a.download = name;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
-    toast('备份已导出：' + name);
+    askBackupCreds({ title: '导出加密备份', showUser: true, confirm: true, tip: '用「用户名 + 密码」加密此备份。密码不会被保存，请务必记好。' }, function (user, pass) {
+      if (user === null || pass === null) return;
+      var d = new Date();
+      var name = 'family-items-backup-' + d.getFullYear() + ('0' + (d.getMonth() + 1)).slice(-2) + ('0' + d.getDate()).slice(-2) + '.fibe';
+      encryptBackup(user, pass, json).then(function (bytes) {
+        var b64 = bytesToB64(bytes);
+        if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) {
+          var cp = window.Capacitor.Plugins;
+          if (cp && cp.Filesystem && cp.Share) {
+            return cp.Filesystem.writeFile({ path: name, data: b64, directory: 'CACHE' })
+              .then(function (res) {
+                return cp.Filesystem.readFile({ path: name, directory: 'CACHE' })
+                  .then(function (r) {
+                    var got = (r && r.data) ? b64ToBytes(r.data).length : 0;
+                    if (got < bytes.length) throw new Error('写入不完整 (' + got + '/' + bytes.length + ' 字节)');
+                    return cp.Share.share({ title: '家庭物品管理系统 加密备份', files: [res.uri] });
+                  });
+              })
+              .then(function () { toast('加密备份已生成：' + name); })
+              .catch(function (e) { toast('导出失败：' + (e && e.message || '未知错误')); });
+            return;
+          }
+        }
+        var blob = new Blob([bytes], { type: 'application/octet-stream' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url; a.download = name;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+        toast('加密备份已导出：' + name);
+      }).catch(function (e) { toast('导出失败：加密出错 ' + (e && e.message || '未知错误')); });
+    });
   }
   // 一键清空物品：确认后清空用户物品，恢复默认演示物品（不清成员/位置/家庭名）
   function clearAllItems() {
@@ -2002,7 +2143,7 @@
   function importBackup() {
     var input = document.createElement('input');
     input.type = 'file';
-    input.accept = '.json,application/json';
+    input.accept = '.json,.fibe,application/json,application/octet-stream';
     input.style.display = 'none';
     var cleaned = false;
     function cleanup() {
@@ -2016,73 +2157,37 @@
       var reader = new FileReader();
       reader.onload = async function () {
         try {
-          var obj = JSON.parse(reader.result);
-          if (!obj || typeof obj !== 'object') { toast('导入失败：无效 JSON'); cleanup(); return; }
-          if (obj.__meta && obj.__meta.app === 'family-items') {
-            // 全量恢复：先清空旧用户数据，再按备份覆盖写入
-            var family = (obj.familyName != null) ? obj.familyName : '';
-            var members = Array.isArray(obj.members) ? obj.members : null;
-            var items = Array.isArray(obj.items) ? obj.items : null;
-            var locs = Array.isArray(obj.locations) ? obj.locations : null;
-            var delItems = Array.isArray(obj.deletedItems) ? obj.deletedItems : null;
-            var delLocs = Array.isArray(obj.deletedLocs) ? obj.deletedLocs : null;
-            var locRens = (obj.locRenames && typeof obj.locRenames === 'object') ? obj.locRenames : null;
-
-            if (family !== '') { try { localStorage.setItem('FAMILY_KEY', family); } catch (e) {} }
-            if (members) saveMembers(members);
-            items = await compressForImport(items || []);   // 压缩超大照片，控制总大小在配额内
-            items = dedupeItems(items);                     // 按名称去重，防止同名重复
-            var okItems = saveUserItems(items);      // 覆盖用户物品（返回是否成功）
-            if (!okItems) { toast('导入失败：数据过大，本地存储空间不足，请清理后重试'); cleanup(); return; }
-            saveLocations(locs || []);       // 覆盖自定义位置
-            saveDeletedLocs(delLocs || []);  // 覆盖已删除位置
-            saveLocRenamed(locRens || {});   // 覆盖内置房间改名
-
-            // “原有数据未清除”：导入后只显示备份里的物品，隐藏未在备份中的内置演示物品
-            var keep = (items || []).map(function (it) { return it.name; });
-            var del = (delItems || []).slice();
-            DEMO_ITEMS.forEach(function (dm) {
-              if (keep.indexOf(dm.name) < 0 && del.indexOf(dm.name) < 0) del.push(dm.name);
+          var raw = reader.result;
+          var u8 = raw instanceof ArrayBuffer ? new Uint8Array(raw) : new Uint8Array(0);
+          var isEnc = u8.length >= 4 && u8[0]===BK_MAGIC[0] && u8[1]===BK_MAGIC[1] && u8[2]===BK_MAGIC[2] && u8[3]===BK_MAGIC[3];
+          if (isEnc) {
+            var parsed = parseBackup(u8);
+            if (!parsed) { toast('导入失败：加密备份格式不正确'); cleanup(); return; }
+            askBackupCreds({ title: '导入加密备份', readonlyUser: parsed.username, tip: '输入密码以解密此备份（用户名来自归档，不可修改）。' }, function (u, p) {
+              if (u === null || p === null) { cleanup(); return; }
+              decryptBackup(parsed, p).then(function (json) {
+                var obj = JSON.parse(json);
+                handleBackupApply(obj, function () { setOwner(parsed.username); toast('归属人已设为 ' + parsed.username); });
+                cleanup();
+              }).catch(function () {
+                toast('解密失败：密码错误或文件已被修改');
+                cleanup();
+              });
             });
-            saveDeleted(del);
-
-            mergeUserItemsIntoDetails();
-            renderItemLists();
-            renderReminderCenter();
-            renderMembers();
-            renderFamily();
-            renderSelfCard();
-            toast('导入成功（已覆盖现有数据）');
-          } else if (Array.isArray(obj)) {
-            // 兼容：整包是个数组，视为用户物品
-            obj = dedupeItems(await compressForImport(obj));
-            if (!saveUserItems(obj)) { toast('导入失败：数据过大，本地存储空间不足，请清理后重试'); cleanup(); return; }
-            hideDemosNotIn(obj.map(function (it) { return it.name; }));
-            toast('导入成功（识别为物品清单）');
-          } else if (obj.items && Array.isArray(obj.items)) {
-            obj.items = dedupeItems(await compressForImport(obj.items));
-            if (!saveUserItems(obj.items)) { toast('导入失败：数据过大，本地存储空间不足，请清理后重试'); cleanup(); return; }
-            hideDemosNotIn(obj.items.map(function (it) { return it.name; }));
-            if (Array.isArray(obj.members)) saveMembers(obj.members);
-            toast('导入成功');
-          } else {
-            toast('导入失败：文件结构无法识别');
+            return;
           }
-          mergeUserItemsIntoDetails();
-          renderItemLists();
-          renderReminderCenter();
-          renderMembers();
-          renderFamily();
-          renderSelfCard();
+          var text = new TextDecoder('utf-8').decode(u8);
+          var obj = JSON.parse(text);
+          handleBackupApply(obj, function () { toast('旧版未加密备份已导入（建议以后导出一律加密）'); });
+          cleanup();
         } catch (err) {
           toast('导入失败：' + (err && err.message ? err.message : '解析错误'));
+          cleanup();
         }
-        cleanup();
       };
       reader.onerror = function () { toast('导入失败：读取文件出错'); cleanup(); };
-      reader.readAsText(file);
+      reader.readAsArrayBuffer(file);
     });
-    // 取消选择时清理隐藏 input（change 不会触发）
     input.addEventListener('cancel', cleanup);
     document.body.appendChild(input);
     setTimeout(cleanup, 60000);
@@ -3797,7 +3902,7 @@
     }
   }
 
-  // —— 注册码 非对称签名（V4.0）：私钥只在生成器，App 只放公钥验证 ——
+  // —— 注册码 加密+签名（V5.0）：密文隐藏明文，私钥只在生成器，App 用公钥验签+解密 ——
   var LICENSE_PUBKEY = {"key_ops":["verify"],"ext":true,"kty":"EC","x":"6jJ_n6s5_eq0uw0_rDebWiLJH_5lRtrQBLF1n51mXrg","y":"K84cVDp-U5GWILbUA8vwMzFILHeZztxA-mMBkfiu0ak","crv":"P-256"};
   function hexToBytes(hex){
     var out = new Uint8Array(hex.length / 2);
@@ -3807,15 +3912,28 @@
   function bytesToHex(bytes){
     return Array.prototype.map.call(bytes, function(b){ return ('0'+b.toString(16)).slice(-2); }).join('').toUpperCase();
   }
-  function verifyLicense(rawHex){
-    var payload = rawHex.slice(0, 24);       // 设备码16 + 到期日8
-    var sig = hexToBytes(rawHex.slice(24));  // ECDSA P-256 签名 64 字节
-    var msg = hexToBytes(payload);
+  function v5EncKey(){
+    return crypto.subtle.digest('SHA-256', new TextEncoder().encode('family-items-lic-v5-enc'))
+      .then(function(h){ return crypto.subtle.importKey('raw', h, {name:'AES-GCM'}, false, ['encrypt','decrypt']); });
+  }
+  function v5Verify(rawHex){
+    var b = hexToBytes(rawHex);
+    if (b.length < 1 + 12 + 64 + 1) return Promise.reject(new Error('注册码格式不正确'));
+    if (b[0] !== 0x34) return Promise.reject(new Error('版本/格式不支持'));
+    var sig = b.slice(b.length - 64);              // 最后 64 字节签名
+    var body = b.slice(0, b.length - 64);          // 版本+IV+密文（会被签名）
     return crypto.subtle.importKey('jwk', LICENSE_PUBKEY, {name:'ECDSA', namedCurve:'P-256'}, false, ['verify'])
       .then(function(key){
-        return crypto.subtle.verify({name:'ECDSA', hash:'SHA-256'}, key, sig, msg).then(function(ok){
+        return crypto.subtle.verify({name:'ECDSA', hash:'SHA-256'}, key, sig, body).then(function(ok){
           if (!ok) throw new Error('签名校验失败');
-          return { dev: payload.slice(0,16), exp: payload.slice(16,24) };
+          var iv = body.slice(1, 13);
+          var ct = body.slice(13);
+          return v5EncKey().then(function(k){
+            return crypto.subtle.decrypt({name:'AES-GCM', iv:iv}, k, ct).then(function(pt){
+              var h = bytesToHex(new Uint8Array(pt));
+              return { dev: h.slice(0,16), exp: h.slice(16,24) };
+            });
+          });
         });
       });
   }
@@ -3853,8 +3971,8 @@
   function activateLicense(code, tipEl){
     if (!crypto || !crypto.subtle){ tipEl.style.color = '#dc2626'; tipEl.textContent = '当前环境不支持安全加密，请在 App 或 https 下激活'; return; }
     var raw = (code || '').toUpperCase().replace(/[^0-9A-F]/g, '');
-    if (raw.length < 50){ tipEl.style.color = '#dc2626'; tipEl.textContent = '注册码太短，请完整粘贴（约 152 位）'; return; }
-    verifyLicense(raw).then(function(p){
+    if (raw.length < 100){ tipEl.style.color = '#dc2626'; tipEl.textContent = '注册码太短，请完整粘贴（约 210 位）'; return; }
+    v5Verify(raw).then(function(p){
       var dev = p.dev, exp = p.exp;
       var devMatch = dev === getDeviceCode();
       var ex = parseExpire(exp);
@@ -3873,7 +3991,7 @@
   }
 
   /* ═══════════ 关于本软件 ═══════════ */
-  var APP_VERSION = '4.0';
+  var APP_VERSION = '6.0';
   var APP_AUTHOR = 'Peter.Xiong';
   var APP_MAKER = '智普 AutoClaw 的设计专家系统';
   var APP_DESC = '本软件由 ' + APP_AUTHOR + ' 利用 ' + APP_MAKER + ' 设计。用于家庭物品管理，如有问题和建议或希望长期使用，请与 Peterx 联系：peterx@qq.com。';
