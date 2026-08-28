@@ -1626,7 +1626,24 @@
 
   /* ── 家庭成员数据（可编辑 + localStorage 持久化） ── */
   var MEMBERS_KEY = 'FAMILY_MEMBERS_V1';
-  var SELF_ID = 'm1'; // 当前登录人的稳定 id（自我判定用 id，改名后仍不变）
+  var SELF_ID_KEY = 'family_items_self_id';
+  var SELF_ID = 'm1'; // 当前登录人的稳定 id（自我判定用 id，改名后仍不变；可被“登录人切换/备份导入”更新）
+  try { var _savedSelf = localStorage.getItem(SELF_ID_KEY); if (_savedSelf) SELF_ID = _savedSelf; } catch (e) {}
+  function saveSelfId(id){ SELF_ID = id; try { localStorage.setItem(SELF_ID_KEY, id); } catch (e) {} }
+  // 按名字找成员；找不到则创建（默认 admin，导入备份的归属人应有管理权）
+  function findOrAddMemberByName(name){
+    var members = loadMembers();
+    for (var i = 0; i < members.length; i++) { if (members[i] && members[i].name === name) return members[i]; }
+    var nm = { id: 'm' + (Date.now() % 100000000), name: name, rel: '', role: 'admin' };
+    members.push(nm); saveMembers(members);
+    return nm;
+  }
+  // 导入加密备份后调用：把“登录人/我的”切到备份归属人
+  function switchSelfToOwner(name){
+    if (!name) return;
+    var m = findOrAddMemberByName(name);
+    if (m && m.id) { saveSelfId(m.id); renderMembers(); renderFamily(); renderSelfCard(); }
+  }
   var SELF_NAME = '王建国'; // 当前登录人展示名（原型演示设定，我的页头像对应）
   var FAMILY_DEFAULT = '熊家';
   function familyName(seed) {
@@ -2198,7 +2215,7 @@
               if (u === null || p === null) { cleanup(); return; }
               decryptBackup(parsed, p).then(function (json) {
                 var obj = JSON.parse(json);
-                handleBackupApply(obj, function () { setOwner(parsed.username); toast('归属人已设为 ' + parsed.username); });
+                handleBackupApply(obj, function () { setOwner(parsed.username); switchSelfToOwner(parsed.username); toast('归属人已设为 ' + parsed.username); });
                 cleanup();
               }).catch(function () {
                 toast('解密失败：密码错误或文件已被修改');
@@ -3166,7 +3183,7 @@
 
   /* ── global click routing ── */
   document.addEventListener('click', function (e) {
-    var el = e.target.closest('[data-action], [data-toast], [data-tab], [data-role="toggle"], [data-role="loc"]');
+    var el = e.target.closest('[data-action], [data-toast], [data-tab], [data-role="toggle"], [data-role="loc"], [data-loc-mode]');
     if (!el) return;
 
     if (el.hasAttribute('data-loc-mode')) {
@@ -4141,7 +4158,7 @@
   }
 
   /* ═══════════ 关于本软件 ═══════════ */
-  var APP_VERSION = '8.0';
+  var APP_VERSION = '8.1';
   var APP_AUTHOR = 'Peter.Xiong';
   var APP_MAKER = '智普 AutoClaw 的设计专家系统';
   var APP_DESC = '本软件由 ' + APP_AUTHOR + ' 利用 ' + APP_MAKER + ' 设计。用于家庭物品管理，如有问题和建议或希望长期使用，请与 Peterx 联系：peterx@qq.com。';
