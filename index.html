@@ -2569,9 +2569,80 @@
       appendChildToNode(targetNode, name, '0 件');
       targetNode.classList.add('open');
     } else {
-      // 父级没找到：兜底为独立顶级节点，避免误插入到别的房间
-      host.appendChild(buildRoomNode(parentLabel + ' · ' + name, note));
+      // 父级没找到：按前缀再找一次（父级可能被改名）；仍失败才降级为独立房间（不造“房间 · 子位”伪节点）
+      var nodes2 = host.querySelectorAll('.loc-node');
+      for (var k = 0; k < nodes2.length; k++) {
+        var h2 = nodes2[k].querySelector('.loc-head');
+        var t2 = h2 ? h2.querySelector('span') : null;
+        if (t2 && parentLabel && t2.textContent.trim().indexOf(parentLabel) === 0) {
+          appendChildToNode(nodes2[k], name, '0 件');
+          nodes2[k].classList.add('open');
+          return;
+        }
+      }
+      host.appendChild(buildRoomNode(name, note));
     }
+  }
+
+  // 位置树整树重建：清空 host → 内置骨架 → 自定义位置（含二级）逐条挂载 → 注入按钮 → 刷新计数
+  // 保证“页面列表”与“保存的数据”严格一致，修复增量挂载可能造成的漏显示/伪顶级节点
+  function rebuildLocationTree() {
+    var host = document.querySelector('#page-locations .pad.stack');
+    if (!host) return;
+    var openState = {};
+    document.querySelectorAll('#page-locations .loc-node').forEach(function (node) {
+      var headEl = node.querySelector('.loc-head');
+      var nameEl = headEl ? headEl.querySelector('span') : null;
+      if (nameEl) openState[nameEl.textContent.trim()] = node.classList.contains('open');
+    });
+    host.innerHTML = '';
+    // 1) 内置房间骨架（含改名映射）
+    BUILTIN_ROOMS.forEach(function (r) {
+      var cur = resolveRenamedName(r.name);
+      var deleted = loadDeletedLocs();
+      if (deleted.indexOf(r.name) >= 0 || deleted.indexOf(cur) >= 0) return;
+      var node = buildRoomNode(cur);
+      if (openState[cur]) node.classList.add('open'); else node.classList.remove('open');
+      r.children.forEach(function (slot) {
+        var full = cur + ' · ' + slot;
+        var slotName = resolveRenamedName(full);
+        var slotLabel = slotName.indexOf(' · ') >= 0 ? slotName.slice(slotName.indexOf(' · ') + 3) : slot;
+        appendChildToNode(node, slotLabel, '0 件');
+      });
+      host.appendChild(node);
+    });
+    // 2) 自定义位置：顶级房间 + 挂到父级（内置或自定义）的二级
+    loadLocations().forEach(function (it) {
+      if (!it || !it.name) return;
+      var name = resolveRenamedName(it.name);
+      var parent = it.parent ? resolveRenamedName(it.parent) : '';
+      if (!parent) {
+        if (isBuiltinRoom(name)) return; // 与内置重名的自定义房间跳过
+        var node = buildRoomNode(name, it.note);
+        if (openState[name]) node.classList.add('open');
+        host.appendChild(node);
+        return;
+      }
+      // 找父级节点（房间头名精确匹配）
+      var target = null;
+      var nodes = host.querySelectorAll('.loc-node');
+      for (var i = 0; i < nodes.length; i++) {
+        var headEl = nodes[i].querySelector('.loc-head');
+        var titleEl = headEl ? headEl.querySelector('span') : null;
+        if (titleEl && titleEl.textContent.trim() === parent) { target = nodes[i]; break; }
+      }
+      if (target) {
+        appendChildToNode(target, name, '0 件');
+        target.classList.add('open');
+      } else {
+        // 父级不存在（被删）：降级为顶级房间，保证数据可见不丢
+        var fallback = buildRoomNode(name, it.note);
+        host.appendChild(fallback);
+      }
+    });
+    injectLocEditButtons();
+    injectLocViewButtons();
+    refreshLocationCounts();
   }
 
   // 核心：新增一条位置 → 保存到本地 + 追加到树
@@ -2647,9 +2718,8 @@
     arr.push({ name: name, parent: parent, note: note, createdAt: Date.now() });
     saveLocations(arr);
 
-    // 2) 追加到位置树
-    var host = document.querySelector('#page-locations .pad.stack');
-    addLocationToTree(host, name, parentLabel, note);
+    // 2) 整树重建：保证列表与保存数据严格一致（含二级位置挂载、按钮与计数刷新）
+    rebuildLocationTree();
 
     // 4) 回到位置页并提示
     showPage('page-locations');
@@ -4158,7 +4228,7 @@
   }
 
   /* ═══════════ 关于本软件 ═══════════ */
-  var APP_VERSION = '8.1';
+  var APP_VERSION = '8.2';
   var APP_AUTHOR = 'Peter.Xiong';
   var APP_MAKER = '智普 AutoClaw 的设计专家系统';
   var APP_DESC = '本软件由 ' + APP_AUTHOR + ' 利用 ' + APP_MAKER + ' 设计。用于家庭物品管理，如有问题和建议或希望长期使用，请与 Peterx 联系：peterx@qq.com。';
