@@ -605,6 +605,7 @@
           <section class="pad" style="margin-bottom: 6px;">
             <div style="display: flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 0 14px; min-height: 46px;">
               <svg viewBox="0 0 24 24" style="width: 18px; height: 18px; stroke: var(--muted); fill: none; stroke-width: 1.8;"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+              <button type="button" id="search-clear" aria-label="清除搜索内容" title="清除搜索内容" style="display: none; border: 0; background: var(--warn-soft); color: var(--warn); font-size: 12px; font-weight: 600; padding: 5px 12px; border-radius: 999px; cursor: pointer; flex: 0 0 auto;">清除</button>
               <input id="search-input" placeholder="搜索物品、位置、备注" aria-label="搜索物品" style="border: 0; background: none; flex: 1; font: inherit; font-size: 14px; outline: none; color: var(--fg);" />
             </div>
           </section>
@@ -1125,7 +1126,10 @@
 
             <div class="field">
               <label for="f-name">物品名称</label>
-              <div class="input editable" id="f-name" contenteditable="true" role="textbox" aria-multiline="false">待填写</div>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <div class="input editable" id="f-name" contenteditable="true" role="textbox" aria-multiline="false" style="flex: 1;">待填写</div>
+                <button type="button" id="fname-clear" aria-label="清除“待填写”" title="一键清除占位文字，直接输入" style="display: inline-block; border: 0; background: var(--accent-soft); color: var(--accent-deep); font-size: 12px; font-weight: 600; padding: 6px 12px; border-radius: 999px; cursor: pointer; flex: 0 0 auto;">清除</button>
+              </div>
               <div class="hint" id="f-name-hint"><span class="conf">·</span> 等待识别结果，也可手动填写</div>
             </div>
 
@@ -2019,7 +2023,9 @@
     });
   }
   function setOwner(name){ if(!name) return; try{ localStorage.setItem(OWNER_KEY, name); }catch(e){} }
+  // 备份凭据弹窗：opts.modeSelect=true 时提供「合并导入/覆盖导入」选择，cb(user, pass, mode)
   function askBackupCreds(opts, cb){
+    var _mode = 'merge';
     var ov = document.createElement('div');
     ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:9999;';
     var box = document.createElement('div');
@@ -2027,6 +2033,22 @@
     function mk(l){ var x=document.createElement('label'); x.style.cssText='display:block;font-size:13px;font-weight:600;margin:12px 0 6px;color:#374151;'; x.textContent=l; return x; }
     function inp(type){ var i=document.createElement('input'); i.type=type||'text'; i.style.cssText='width:100%;padding:11px 13px;border:1px solid #e6eaf2;border-radius:10px;font-size:15px;box-sizing:border-box;'; return i; }
     var title=document.createElement('div'); title.style.cssText='font-size:17px;font-weight:700;margin:0 0 4px;'; title.textContent=opts.title; box.appendChild(title);
+    if (opts.modeSelect) {
+      var mWrap = document.createElement('div'); mWrap.style.cssText = 'display:flex;gap:8px;margin-top:14px;';
+      function mkBtn(txt, val, on){ var b=document.createElement('button'); b.type='button'; b.textContent=txt;
+        b.style.cssText = 'flex:1;padding:9px 0;border-radius:10px;border:1px solid #dbe3ef;background:' + (on ? '#2563eb' : '#fff') + ';color:' + (on ? '#fff' : '#3b4252') + ';font-size:13.5px;font-weight:600;cursor:pointer;';
+        b.setAttribute('data-mode', val);
+        b.addEventListener('click', function(){ _mode = val;
+          mWrap.querySelectorAll('button').forEach(function(x){ var on2 = x.getAttribute('data-mode') === _mode;
+            x.style.background = on2 ? '#2563eb' : '#fff'; x.style.color = on2 ? '#fff' : '#3b4252'; }); });
+        return b; }
+      mWrap.appendChild(mkBtn('合并导入（推荐）', 'merge', true));
+      mWrap.appendChild(mkBtn('覆盖导入', 'replace', false));
+      box.appendChild(mWrap);
+      var mTip = document.createElement('div'); mTip.style.cssText = 'font-size:12px;color:#6b7688;margin-top:6px;';
+      mTip.textContent = '合并：两边物品/位置取合集，同名以修改时间新者为准；覆盖：用备份整体替换本机数据';
+      box.appendChild(mTip);
+    }
     var userInp=null, passInp=null, pass2Inp=null, msg=null;
     if (opts.readonlyUser){
       box.appendChild(mk('备份归属'));
@@ -2054,15 +2076,23 @@
       if (!opts.readonlyUser && opts.showUser && !u){ msg.textContent='请输入用户名'; return; }
       if (!p){ msg.textContent='请输入密码'; return; }
       if (opts.confirm && p!==pass2Inp.value){ msg.textContent='两次输入的密码不一致'; return; }
-      close(); cb(u, p);
+      close(); cb(u, p, opts.modeSelect ? _mode : null);
     }
-    ok.onclick=doOk; cc.onclick=function(){ close(); cb(null,null); };
-    ov.onclick=function(e){ if(e.target===ov){ close(); cb(null,null); } };
+    ok.onclick=doOk; cc.onclick=function(){ close(); cb(null,null,null); };
+    ov.onclick=function(e){ if(e.target===ov){ close(); cb(null,null,null); } };
     passInp.addEventListener('keydown',function(e){ if(e.key==='Enter') doOk(); });
     if (pass2Inp) pass2Inp.addEventListener('keydown',function(e){ if(e.key==='Enter') doOk(); });
   }
 
-  async function handleBackupApply(obj, after) {
+  // 物品时间戳：updatedAt 优先，其次 added（文本 YYYY-MM-DD），均无返回 0
+  function itemStamp(it){
+    if (!it) return 0;
+    if (it.updatedAt) { var t = new Date(it.updatedAt).getTime(); if (!isNaN(t)) return t; }
+    if (it.added) { var t2 = new Date(it.added).getTime(); if (!isNaN(t2)) return t2; }
+    return 0;
+  }
+  async function handleBackupApply(obj, after, importOpts) {
+    var importMode = (importOpts && importOpts.mode) || 'replace';
     try {
       if (obj && obj.__meta && obj.__meta.app === 'family-items') {
         var family = (obj.familyName != null) ? obj.familyName : '';
@@ -2072,17 +2102,87 @@
         var delItems = Array.isArray(obj.deletedItems) ? obj.deletedItems : null;
         var delLocs = Array.isArray(obj.deletedLocs) ? obj.deletedLocs : null;
         var locRens = (obj.locRenames && typeof obj.locRenames === 'object') ? obj.locRenames : null;
-        if (family !== '') { try { localStorage.setItem('FAMILY_KEY', family); } catch (e) {} }
-        if (members) saveMembers(members);
-        items = await compressForImport(items || []);
-        items = dedupeItems(items);
-        if (!saveUserItems(items)) { toast('导入失败：数据过大，本地存储空间不足，请清理后重试'); return false; }
-        saveLocations(locs || []); saveDeletedLocs(delLocs || []); saveLocRenamed(locRens || {});
-        var keep = (items || []).map(function (it) { return it.name; });
-        var del = (delItems || []).slice();
-        DEMO_ITEMS.forEach(function (dm) { if (keep.indexOf(dm.name) < 0 && del.indexOf(dm.name) < 0) del.push(dm.name); });
-        saveDeleted(del);
-        toast('导入成功（已覆盖现有数据）');
+        if (importMode === 'merge') {
+          // ── 合并导入：物品按名合并（时间新者赢），位置/删除清单/成员取并集，改名映射合并 ──
+          var stats = { addedN: 0, updatedN: 0, keptN: 0 };
+          toast('合并中：1/4 物品合并…');
+          // 备份物品清洗：name 必须、其余字段给默认，防老版本备份形状差异
+          (items || []).forEach(function (it) {
+            if (!it || typeof it !== 'object') return;
+            if (!it.name || typeof it.name !== 'string') { it.name = String(it.name || ''); }
+            it.category = it.category || '其他';
+            it.loc = it.loc || '未设置';
+            it.qty = it.qty || '1';
+            it.badge = it.badge || 'ok';
+            it.badgeText = it.badgeText || '正常';
+            it.photo = it.photo || '';
+          });
+          var localItems = loadUserItems();
+          var byName = {};
+          localItems.forEach(function (it) { if (it && it.name && !byName[it.name]) byName[it.name] = it; });
+          var merged = localItems.slice();
+          (items || []).forEach(function (it) {
+            if (!it || !it.name) return;
+            var cur = byName[it.name];
+            if (!cur) { merged.push(it); byName[it.name] = it; stats.addedN++; return; }
+            var curT = itemStamp(cur), newT = itemStamp(it);
+            if (newT > curT) {
+              for (var i = 0; i < merged.length; i++) { if (merged[i] && merged[i].name === it.name) { merged[i] = it; break; } }
+              stats.updatedN++;
+            } else { stats.keptN++; }
+          });
+          toast('合并中：2/4 保存物品…');
+          items = dedupeItems(await compressForImport(merged));
+          if (!saveUserItems(items)) { toast('导入失败：数据过大，本地存储空间不足，请清理后重试'); return false; }
+          toast('合并中：3/4 位置与成员…');
+          // 位置并集：全名（父 · 名）去重
+          var locMap = {};
+          loadLocations().forEach(function (x) { if (x && x.name) locMap[(x.parent ? x.parent + ' · ' : '') + x.name] = x; });
+          (locs || []).forEach(function (x) { if (x && x.name && !locMap[(x.parent ? x.parent + ' · ' : '') + x.name]) locMap[(x.parent ? x.parent + ' · ' : '') + x.name] = x; });
+          saveLocations(Object.keys(locMap).map(function (k) { return locMap[k]; }));
+          // 删除清单并集
+          var delSet = {};
+          loadDeletedLocs().forEach(function (n) { if (n) delSet[n] = 1; });
+          (delLocs || []).forEach(function (n) { if (n) delSet[n] = 1; });
+          saveDeletedLocs(Object.keys(delSet));
+          var delSet2 = {};
+          loadDeleted().forEach(function (n) { if (n) delSet2[n] = 1; });
+          (delItems || []).forEach(function (n) { if (n) delSet2[n] = 1; });
+          // 物品删除清单并集（合并模式下仅当两边都认为“演示物品该隐藏”时隐藏：备份里不在 keep 的演示物品不强制隐藏）
+          var keepSet = {};
+          (items || []).forEach(function (it) { if (it && it.name) keepSet[it.name] = 1; });
+          var delFinal = Object.keys(delSet2);
+          saveDeleted(delFinal);
+          // 改名映射合并（备份键不覆盖本机已有键）
+          var renMap = loadLocRenamed();
+          Object.keys(locRens || {}).forEach(function (k) { if (!(k in renMap)) renMap[k] = locRens[k]; });
+          saveLocRenamed(renMap);
+          // 成员并集（按 id 去重；缺 role/名字的备份成员补默认值，防渲染 undefined）
+          var memMap = {};
+          loadMembers().forEach(function (m) { if (m && m.id) memMap[m.id] = m; });
+          (members || []).forEach(function (m) {
+            if (m && m.id && !memMap[m.id]) {
+              memMap[m.id] = { id: m.id, name: m.name || ('成员' + m.id), rel: m.rel || '', role: (VALID_ROLE.indexOf(m.role) >= 0 ? m.role : 'member') };
+            }
+          });
+          saveMembers(Object.keys(memMap).map(function (k) { return memMap[k]; }));
+          // 家庭名：本机为空才采用备份的
+          if (!family) { try { var _f = localStorage.getItem('FAMILY_KEY'); if (!_f && family !== '') localStorage.setItem('FAMILY_KEY', family); } catch (e) {} }
+          toast('合并中：4/4 刷新界面…');
+          toast('合并完成：新增 ' + stats.addedN + ' 件 · 更新 ' + stats.updatedN + ' 件 · 保留 ' + stats.keptN + ' 件');
+        } else {
+          if (family !== '') { try { localStorage.setItem('FAMILY_KEY', family); } catch (e) {} }
+          if (members) saveMembers(members);
+          items = await compressForImport(items || []);
+          items = dedupeItems(items);
+          if (!saveUserItems(items)) { toast('导入失败：数据过大，本地存储空间不足，请清理后重试'); return false; }
+          saveLocations(locs || []); saveDeletedLocs(delLocs || []); saveLocRenamed(locRens || {});
+          var keep = (items || []).map(function (it) { return it.name; });
+          var del = (delItems || []).slice();
+          DEMO_ITEMS.forEach(function (dm) { if (keep.indexOf(dm.name) < 0 && del.indexOf(dm.name) < 0) del.push(dm.name); });
+          saveDeleted(del);
+          toast('导入成功（已覆盖现有数据）');
+        }
       } else if (Array.isArray(obj)) {
         obj = dedupeItems(await compressForImport(obj));
         if (!saveUserItems(obj)) { toast('导入失败：数据过大，本地存储空间不足，请清理后重试'); return false; }
@@ -2097,11 +2197,33 @@
       } else {
         toast('导入失败：文件结构无法识别'); return false;
       }
-      mergeUserItemsIntoDetails(); renderItemLists(); renderReminderCenter(); renderMembers(); renderFamily(); renderSelfCard();
+      function safeStep(name, fn) {
+        try { fn(); }
+        catch (se) { console.error('导入后渲染步骤失败 [' + name + ']:', se); toast('导入完成，但刷新[' + name + ']出错：' + (se && se.message || se)); }
+      }
+      mergeUserItemsIntoDetails();
+      safeStep('物品列表', renderItemLists);
+      safeStep('提醒中心', renderReminderCenter);
+      safeStep('成员', renderMembers);
+      safeStep('家庭卡', renderFamily);
+      safeStep('我的卡片', renderSelfCard);
+      // 位置数据已覆盖保存：同步应用改名/删除映射 + 整树重建 + 刷新各页位置下拉，否则页面树停留在导入前状态
+      safeStep('位置改名', applyLocRenames);
+      safeStep('位置删除', applyLocDeletions);
+      safeStep('位置列表', rebuildLocationTree);
+      safeStep('位置下拉', ensureLocSelects);
       if (typeof after === 'function') after();
       return true;
     } catch (e) {
-      toast('导入失败：' + (e && e.message ? e.message : '解析错误'));
+      var _em = (e && (e.message || e.name)) ? (e.name ? e.name + ': ' + e.message : e.message) : '未知错误';
+      var _st = (e && e.stack) ? String(e.stack) : '';
+      var _at = '';
+      if (_st) {
+        var _lines = _st.split('\n').filter(function (x) { return x.indexOf('at ') >= 0; });
+        if (_lines.length) _at = _lines.slice(0, 2).join(' | ').slice(0, 160);
+      }
+      toast('导入失败：' + _em + (_at ? ' @' + _at : ''));
+      console.error('导入异常:', e);
       return false;
     }
   }
@@ -2211,12 +2333,21 @@
           if (isEnc) {
             var parsed = parseBackup(u8);
             if (!parsed) { toast('导入失败：加密备份格式不正确'); cleanup(); return; }
-            askBackupCreds({ title: '导入加密备份', readonlyUser: parsed.username, tip: '输入密码以解密此备份（用户名来自归档，不可修改）。' }, function (u, p) {
+            askBackupCreds({ title: '导入加密备份', readonlyUser: parsed.username, modeSelect: true, tip: '输入密码以解密此备份（用户名来自归档，不可修改）。' }, function (u, p, mode) {
               if (u === null || p === null) { cleanup(); return; }
+              var useMode = mode || 'merge';
               decryptBackup(parsed, p).then(function (json) {
-                var obj = JSON.parse(json);
-                handleBackupApply(obj, function () { setOwner(parsed.username); switchSelfToOwner(parsed.username); toast('归属人已设为 ' + parsed.username); });
-                cleanup();
+                var obj;
+                try { obj = JSON.parse(json); }
+                catch (pe) { toast('导入失败：备份内容解析出错（' + (pe && pe.message || '格式异常') + '）'); cleanup(); return; }
+                handleBackupApply(obj, function () {
+                  if (useMode === 'replace') { setOwner(parsed.username); switchSelfToOwner(parsed.username); toast('归属人已设为 ' + parsed.username); }
+                }, { mode: useMode }).then(function (okr) {
+                  if (okr === false) { /* 失败提示已由内部给出 */ }
+                }).catch(function (ie) {
+                  toast('导入失败：' + ((ie && (ie.message || ie.name)) || '处理异常'));
+                  cleanup();
+                });
               }).catch(function () {
                 toast('解密失败：密码错误或文件已被修改');
                 cleanup();
@@ -2334,18 +2465,38 @@
   /* ── 存放位置统一数据源（下拉菜单选项）：由内置房间结构 + 自定义位置派生，不写死 ── */
   function locOptionsHtml(selectedLoc) {
     var opts = [];
-    // 内置房间及收纳位（按“房间 · 子位”全名）
-    BUILTIN_ROOMS.forEach(function (r) {
-      opts.push(r.name);
-      (r.children || []).forEach(function (c) { opts.push(r.name + ' · ' + c); });
-    });
-    // 追加已保存的自定义位置（去重，让新增的位置也能被选用）
-    loadLocations().forEach(function (item) {
-      if (!item || !item.name) return;
-      var label = item.name;
-      if (item.parent) label = item.parent + ' · ' + item.name;
-      if (opts.indexOf(label) < 0) opts.push(label);
-    });
+    // 顺序源＝位置页树（用户看到/维护的真实顺序，含新增二级位置与改名）；
+    // 树尚未渲染时回退到内置骨架 + 自定义数据
+    var treeNodes = document.querySelectorAll('#page-locations .loc-node');
+    if (treeNodes.length) {
+      treeNodes.forEach(function (node) {
+        var headEl = node.querySelector('.loc-head');
+        var nameEl = headEl ? headEl.querySelector('span') : null;
+        var room = nameEl ? nameEl.textContent.trim() : '';
+        if (room && opts.indexOf(room) < 0) opts.push(room);
+        node.querySelectorAll('.loc-child').forEach(function (child) {
+          var subEl = child.querySelector('span');
+          var cName = subEl ? subEl.textContent.trim() : '';
+          if (!cName) return;
+          var cCount = child.querySelector('.loc-count');
+          if (cCount && cCount.textContent.trim() === '—') return; // 备注行不作为可选位置
+          var full = room ? (room + ' · ' + cName) : cName;
+          if (full && opts.indexOf(full) < 0) opts.push(full);
+        });
+      });
+    } else {
+      BUILTIN_ROOMS.forEach(function (r) {
+        opts.push(resolveRenamedName(r.name));
+        (r.children || []).forEach(function (c) { opts.push(resolveRenamedName(r.name) + ' · ' + c); });
+      });
+      loadLocations().forEach(function (item) {
+        if (!item || !item.name) return;
+        var label = item.parent ? (item.parent + ' · ' + item.name) : item.name;
+        if (opts.indexOf(label) < 0) opts.push(label);
+      });
+    }
+    // 兜底：当前选中值不在列表里（历史数据）也补进去，避免丢选中
+    if (selectedLoc && opts.indexOf(selectedLoc) < 0) opts.unshift(selectedLoc);
     var s = '';
     opts.forEach(function (o) {
       var sel = (o === selectedLoc) ? ' selected' : '';
@@ -2643,6 +2794,7 @@
     injectLocEditButtons();
     injectLocViewButtons();
     refreshLocationCounts();
+    ensureLocSelects();
   }
 
   // 核心：新增一条位置 → 保存到本地 + 追加到树
@@ -3420,16 +3572,33 @@
     ensureCamEls();
     if (!camVideo || !camVideo.videoWidth) return null;
     var vw = camVideo.videoWidth, vh = camVideo.videoHeight;
-    // 存储端压缩：限制最长边，避免 localStorage 被大图占满
-    var maxW = 760;
+    // 存储端压缩：限制最长边，避免 localStorage 被大图占满（480px 足够列表/详情缩略图显示）
+    var maxW = 480;
     var scale = vw > maxW ? (maxW / vw) : 1;
     var cw = Math.round(vw * scale), ch = Math.round(vh * scale);
     var canvas = document.createElement('canvas');
     canvas.width  = cw;
     canvas.height = ch;
     canvas.getContext('2d').drawImage(camVideo, 0, 0, cw, ch);
-    return canvas.toDataURL('image/jpeg', 0.6);
+    return canvas.toDataURL('image/jpeg', 0.5);
   }
+
+  // 高清抓帧：证件等重要物品用（最长边 1280px / 质量 0.85），保原件可读性
+  function grabFrameHQ() {
+    ensureCamEls();
+    if (!camVideo || !camVideo.videoWidth) return null;
+    var vw = camVideo.videoWidth, vh = camVideo.videoHeight;
+    var maxW = 1280;
+    var scale = vw > maxW ? (maxW / vw) : 1;
+    var cw = Math.round(vw * scale), ch = Math.round(vh * scale);
+    var canvas = document.createElement('canvas');
+    canvas.width  = cw;
+    canvas.height = ch;
+    canvas.getContext('2d').drawImage(camVideo, 0, 0, cw, ch);
+    return canvas.toDataURL('image/jpeg', 0.85);
+  }
+  // 证件类判定（重要证件照片不压缩、不自动降质）
+  function isCertCat(cat) { return String(cat || '').indexOf('证件') >= 0; }
   // 对超大照片做二次压缩（导入/迁移时调用），返回 Promise<dataUrl>，失败则原样返回
   function recompressPhoto(src, maxW, q) {
     return new Promise(function (resolve) {
@@ -3461,6 +3630,44 @@
     }
     return out;
   }
+  // ── 容量自适应保存：localStorage 快满时自动降低全部照片质量重试，避免"存不了" ──
+  // 返回 { ok, downgraded }；downgraded=true 表示曾自动降级压缩后成功
+  async function saveUserItemsResilient(arr) {
+    var levels = [
+      { maxW: 640, q: 0.5 },
+      { maxW: 480, q: 0.42 },
+      { maxW: 360, q: 0.35 },
+      { maxW: 240, q: 0.3 }
+    ];
+    for (var li = -1; li < levels.length; li++) {
+      var candidate = arr;
+      if (li >= 0) {
+        // 把所有含大照片的物品重压缩到当前档；证件类照片跳过（保原件，宁可不存也不压证件）
+        var next = [];
+        for (var i = 0; i < arr.length; i++) {
+          var it = arr[i];
+          if (it && it.photo && it.photo.length > 20000 && !isCertCat(it.category)) {
+            try { it.photo = await recompressPhoto(it.photo, levels[li].maxW, levels[li].q); } catch (e) {}
+          }
+          next.push(it);
+        }
+        candidate = next;
+      }
+      if (saveUserItems(candidate)) {
+        return { ok: true, downgraded: li >= 0 };
+      }
+    }
+    // 最后兜底：剥离非证件照片只存文字数据，确保证件照片与物品信息都不丢
+    var noPhoto = arr.map(function (it) {
+      if (it && it.photo && !isCertCat(it.category)) {
+        var c = {}; for (var k in it) { if (k !== 'photo') c[k] = it[k]; } return c;
+      }
+      return it;
+    });
+    if (saveUserItems(noPhoto)) { return { ok: true, downgraded: true, stripped: true }; }
+    return { ok: false, downgraded: false };
+  }
+
   // 离开页面/切后台时释放摄像头，避免占用与白屏
   window.addEventListener('pagehide', stopCamera);
   document.addEventListener('visibilitychange', function () { if (document.hidden) stopCamera(); });
@@ -3487,6 +3694,7 @@
           if (res.name) { theName = res.name.split(',')[0].trim(); }
           else { theName = res.category; }
           if (nameEl) nameEl.textContent = theName || '待填写';
+          if (typeof syncFnameClear === 'function') syncFnameClear();
           var sName = document.getElementById('scan-confirm-name'); if (sName) sName.textContent = theName || '——';
           var sStatus = document.getElementById('scan-confirm-status'); if (sStatus) sStatus.textContent = '已识别为「' + res.category + '」';
           var sTip = document.getElementById('scan-confirm-tip'); if (sTip) sTip.textContent = '请在下方确认或修改信息后保存';
@@ -3496,6 +3704,7 @@
           tags.forEach(function (t) { if (t.textContent.trim() === res.category) t.classList.add('active'); });
         } else {
           if (nameEl) nameEl.textContent = '待填写';
+          if (typeof syncFnameClear === 'function') syncFnameClear();
           var sName2 = document.getElementById('scan-confirm-name'); if (sName2) sName2.textContent = '未识别到物品';
           var sStatus2 = document.getElementById('scan-confirm-status'); if (sStatus2) sStatus2.textContent = '未识别到物品';
           var sTip2 = document.getElementById('scan-confirm-tip'); if (sTip2) sTip2.textContent = '请在下方手动填写物品信息，或重新拍摄';
@@ -3509,7 +3718,26 @@
   document.getElementById('save-item-edit').addEventListener('click', function () { saveItemEdit(); });
   document.getElementById('cancel-item-edit').addEventListener('click', function () { resetDetailEditMode(); });
 
-  document.getElementById('save-item').addEventListener('click', function () {
+  // 物品名称“清除”按钮：清空为待填写占位；有实质内容时显示
+  var _fnameEl = document.getElementById('f-name');
+  var _fnameClear = document.getElementById('fname-clear');
+  function syncFnameClear() {
+    if (!_fnameEl || !_fnameClear) return;
+    // 有任何文字（含“待填写”占位）→ 显示清除；已空 → 隐藏
+    var v = (_fnameEl.textContent || '').trim();
+    _fnameClear.style.display = v ? 'inline-block' : 'none';
+  }
+  if (_fnameEl) {
+    _fnameEl.addEventListener('input', syncFnameClear);
+    _fnameClear.addEventListener('click', function () {
+      // 一键清掉“待填写”（或已输入的草稿），光标进入直接输入
+      _fnameEl.textContent = '';
+      syncFnameClear();
+      _fnameEl.focus();
+    });
+  }
+
+  document.getElementById('save-item').addEventListener('click', async function () {
     var nameEl = document.getElementById('f-name');
     var locEl = document.getElementById('f-loc');
     var qtyEl = document.getElementById('f-qty');
@@ -3521,23 +3749,44 @@
     var today = new Date();
     var dstr = today.toISOString().slice(0, 10);
     var savedLoc = locEl ? locEl.value : '未设置';
-    upsertUserItem({
+    // 证件类：重新抓高清帧，保证大图可读（未压缩版）
+    var _shot = window.__lastShotDataURL || '';
+    if (isCertCat(cat) && camVideo && camVideo.videoWidth) {
+      var _hq = grabFrameHQ();
+      if (_hq) _shot = _hq;
+    }
+    // 重名自动编号：库中已有同名物品时，自动追加数字（水杯 → 水杯2 → 水杯3…），并提醒
+    var _all = loadUserItems();
+    var _exists = {};
+    _all.forEach(function (it) { if (it && it.name) _exists[it.name] = 1; });
+    var _dupTip = '';
+    if (_exists[name]) {
+      var _n = 2;
+      while (_exists[name + _n]) { _n++; }
+      _dupTip = name;
+      name = name + _n;
+      nameEl.textContent = name;   // 确认页名称同步显示编号结果，所见即所得
+      toast('库中已有「' + _dupTip + '」，已自动编号为「' + name + '」');
+    }
+    var _newItem = {
       name: name,
       category: cat,
       loc: savedLoc,
       qty: qtyEl ? qtyEl.textContent.trim() : '1',
       tags: tagEl ? tagEl.textContent.trim() : '',
       badge: 'ok', badgeText: '正常', added: dstr, member: '1',
-      note: '', prod: '—', exp: '—', batch: '—', photo: window.__lastShotDataURL || ''
-    });
-    // 校验是否真正持久化（localStorage 容量不足等会静默失败，导致重启后物品/照片丢失）
-    var ok = loadUserItems().some(function (it) { return it && it.name === name; });
-    if (!ok) { toast('保存失败：本地存储空间不足，请清理后重试'); return; }
+      note: '', prod: '—', exp: '—', batch: '—', photo: _shot
+    };
+    var _arr = loadUserItems().filter(function (it) { return !(it && it.name === name); });
+    _arr.unshift(_newItem);
+    var _res = await saveUserItemsResilient(_arr);
+    if (!_res.ok) { toast('保存失败：本地存储空间不足，请清理后重试'); return; }
+    if (_res.downgraded) { toast(_res.stripped ? '存储已满：已自动精简照片保存' : '存储较满：已自动压缩照片保存'); }
     mergeUserItemsIntoDetails();
     renderItemLists();
     renderReminderCenter();
-    toast('已加入物品库');
-    setTimeout(goHome, 700);
+    if (!_dupTip) toast('已加入物品库');
+    setTimeout(goHome, 900);
   });
 
   /* ── 物品列表统一渲染（数据驱动：localStorage 用户物品 + 演示物品） ── */
@@ -3732,10 +3981,26 @@
   bindCatTabs();
   // 搜索框：按名称 / 存放位置 / 数量实时过滤（与分类标签组合生效）
   var _searchInput = document.getElementById('search-input');
+  var _searchClear = document.getElementById('search-clear');
+  function syncSearchClear() {
+    if (_searchClear) _searchClear.style.display = (_searchInput && _searchInput.value.trim()) ? 'inline-block' : 'none';
+  }
   if (_searchInput) {
     _searchInput.addEventListener('input', function () {
       window._searchKw = _searchInput.value.trim();
+      syncSearchClear();
       renderItemLists();
+    });
+  }
+  if (_searchClear) {
+    _searchClear.addEventListener('click', function () {
+      if (_searchInput) {
+        _searchInput.value = '';
+        window._searchKw = '';
+        renderItemLists();
+        _searchInput.focus();
+      }
+      syncSearchClear();
     });
   }
   // 刷新所有统计卡（物品页 + 位置页），在 init 与数据变更后调用
@@ -3917,6 +4182,12 @@
       if (!frame) { toast('拍摄失败，请重试'); showPage('page-medicine'); startCamera(); return; }
       var pName = _viewingItem;
       var dP = ITEM_DETAILS[pName] || {};
+      // 证件类：改用高清帧（不压缩保原件）
+      var _frame = frame;
+      if (isCertCat(dP.cat || dP.category)) {
+        var _hq2 = grabFrameHQ();
+        if (_hq2) { _frame = _hq2; window.__lastShotDataURL = _hq2; }
+      }
       var dmP = (dP.meta || '').match(/@(\w+)/);
       var addedP = ((dP.meta || '').match(/添加于\s*([\d-]+)/) || [])[1] || '';
       upsertUserItem({ name: pName, category: dP.cat || dP.category || '其他', loc: dP.loc || '未设置', qty: dP.qty || '1', tags: dP.tags || '', badge: dP.badge || 'ok', badgeText: dP.badgeText || '正常', added: addedP, member: (dmP && dmP[1]) || '1', note: dP.note || '', prod: dP.prod || '—', exp: dP.exp || '—', batch: dP.batch || '—', photo: frame });
@@ -4238,7 +4509,7 @@
   }
 
   /* ═══════════ 关于本软件 ═══════════ */
-  var APP_VERSION = '8.3';
+  var APP_VERSION = '9.5';
   var APP_AUTHOR = 'Peter.Xiong';
   var APP_MAKER = '智普 AutoClaw 的设计专家系统';
   var APP_DESC = '本软件由 ' + APP_AUTHOR + ' 利用 ' + APP_MAKER + ' 设计。用于家庭物品管理，如有问题和建议或希望长期使用，请与 Peterx 联系：peterx@qq.com。';
@@ -4269,10 +4540,11 @@
   /* ── 初始化：渲染成员列表 + 家庭名 ── */
   // 填充存放位置下拉（拍照/药品确认页共用）
   function ensureLocSelects() {
+    // 始终刷新：位置新增/改名/排序后，各页下拉立即与位置树同步
     var f = document.getElementById('f-loc');
-    if (f && !f.options.length) { f.innerHTML = locOptionsHtml('卧室-祥 · 书桌'); }
+    if (f) { var cur = f.value; f.innerHTML = locOptionsHtml(cur || '卧室-祥 · 书桌'); }
     var m = document.getElementById('m-loc');
-    if (m && !m.options.length) { m.innerHTML = locOptionsHtml('办公室 · 书柜'); }
+    if (m) { var cur2 = m.value; m.innerHTML = locOptionsHtml(cur2 || '办公室 · 书柜'); }
   }
   ensureLocSelects();
   applyLocRenames();
