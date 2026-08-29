@@ -2987,7 +2987,17 @@
     el.innerHTML = html;
   }
   function fillDetail(name) {
-    var d = ITEM_DETAILS[name] || ITEM_DETAILS['布洛芬缓释胶囊'];
+    var d = ITEM_DETAILS[name];
+    if (!d) {
+      // 详情数据源缺失时：先从用户物品实时合并（修复“列表与详情信息不一致”），仍无才用演示兜底
+      var _found = null;
+      loadUserItems().forEach(function (it) { if (!_found && it && it.name === name) _found = it; });
+      if (_found) {
+        mergeUserItemsIntoDetails();
+        d = ITEM_DETAILS[name];
+      }
+    }
+    if (!d) d = ITEM_DETAILS[name] || ITEM_DETAILS['布洛芬缓释胶囊'];
     document.getElementById('dt-name').textContent = name;
     var badge = document.getElementById('dt-badge');
     badge.className = 'badge ' + d.badge;
@@ -4228,7 +4238,7 @@
   }
 
   /* ═══════════ 关于本软件 ═══════════ */
-  var APP_VERSION = '8.2';
+  var APP_VERSION = '8.3';
   var APP_AUTHOR = 'Peter.Xiong';
   var APP_MAKER = '智普 AutoClaw 的设计专家系统';
   var APP_DESC = '本软件由 ' + APP_AUTHOR + ' 利用 ' + APP_MAKER + ' 设计。用于家庭物品管理，如有问题和建议或希望长期使用，请与 Peterx 联系：peterx@qq.com。';
@@ -4265,7 +4275,11 @@
     if (m && !m.options.length) { m.innerHTML = locOptionsHtml('办公室 · 书柜'); }
   }
   ensureLocSelects();
-  restoreLocations();
+  applyLocRenames();
+  applyLocDeletions();
+  restoreLocations();          // 增量恢复自定义位置（兜底）
+  mergeUserItemsIntoDetails(); // 用户物品先并入详情数据源，列表/详情同源
+  rebuildLocationTree();       // 整树重建：列表与保存数据严格一致（含历史漏挂的二级位置）
   initDateSteppers();
   updateHomeGreeting();
   injectLocViewButtons();
@@ -4273,8 +4287,6 @@
   renderItemLists();
   renderReminderCenter();
   refreshItemStatsAll();
-  applyLocRenames();
-  applyLocDeletions();
   injectLocEditButtons();
   renderMembers();
   renderFamily();
