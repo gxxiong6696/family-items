@@ -4350,6 +4350,7 @@
     return { status:'trial', remain: TRIAL_DAYS - daysBetween(start, today), expire:'' };
   }
 
+  try { window.licenseInfo = licenseInfo; window.LICENSE_CONTACT = LICENSE_CONTACT; } catch (e) {}
   // —— 顶部提醒条（常驻，可关闭）——
   var _licNotice;
   function ensureLicNotice(){
@@ -4509,7 +4510,8 @@
   }
 
   /* ═══════════ 关于本软件 ═══════════ */
-  var APP_VERSION = '9.5';
+  var APP_VERSION = '9.8';
+  window.APP_VERSION = APP_VERSION;   // 暴露给锁屏等外部脚本
   var APP_AUTHOR = 'Peter.Xiong';
   var APP_MAKER = '智普 AutoClaw 的设计专家系统';
   var APP_DESC = '本软件由 ' + APP_AUTHOR + ' 利用 ' + APP_MAKER + ' 设计。用于家庭物品管理，如有问题和建议或希望长期使用，请与 Peterx 联系：peterx@qq.com。';
@@ -4695,5 +4697,203 @@
 
   })();
 </script>
+
+<!-- ════════════ 启动密码锁（全屏遮罩层） ════════════ -->
+<div id="app-lock" style="position:fixed; inset:0; z-index:12000; background:linear-gradient(160deg,#2B3A55 0%,#22304A 100%); display:none; align-items:center; justify-content:center; flex-direction:column;">
+  <div id="lock-info" style="position:absolute; top:14px; left:14px; text-align:left; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.14); border-radius:10px; padding:8px 12px;">
+    <div style="color:rgba(255,255,255,.85); font-size:12.5px; font-family:Consolas,monospace; font-weight:600;" id="lock-ver"></div>
+    <div style="color:rgba(255,255,255,.65); font-size:11.5px; margin-top:3px;" id="lock-lic"></div>
+  </div>
+  <div style="width:64px;height:64px;border-radius:50%;background:rgba(255,255,255,.12);display:grid;place-items:center;margin-bottom:18px;">
+    <svg viewBox="0 0 24 24" style="width:30px;height:30px;stroke:#fff;fill:none;stroke-width:1.8;"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+  </div>
+  <div style="color:#fff;font-size:18px;font-weight:700;margin-bottom:4px;">家庭物品管理系统</div>
+  <div style="color:rgba(255,255,255,.65);font-size:13px;margin-bottom:26px;" id="lock-sub">请输入启动密码</div>
+  <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;">
+    <input id="lock-pass" type="password" inputmode="numeric" maxlength="8" placeholder="••••" aria-label="启动密码" style="width:180px;padding:12px 14px;border:1px solid rgba(255,255,255,.25);border-radius:12px;font-size:18px;letter-spacing:6px;text-align:center;background:rgba(255,255,255,.1);color:#fff;outline:none;" />
+    <button type="button" id="lock-ok" style="padding:12px 22px;border:none;border-radius:12px;background:var(--accent,#3D6BFF);color:#fff;font-size:15px;font-weight:700;cursor:pointer;">确认登录</button>
+  </div>
+  <div id="lock-err" style="color:#FF8A8A;font-size:12.5px;min-height:18px;margin-bottom:8px;"></div>
+  <label style="display:flex;align-items:center;gap:8px;color:rgba(255,255,255,.75);font-size:13px;cursor:pointer;">
+    <input type="checkbox" id="lock-trust" style="width:16px;height:16px;accent-color:#3D6BFF;" /> 下次免输入，直接确认登录
+  </label>
+</div>
+
+
+<script>
+/* ── 启动密码锁：SHA-256 哈希存储 + 免输记住 + 我的页管理 ── */
+(function () {
+  'use strict';
+  var LOCK_HASH_KEY = 'family…lock_h';
+  var LOCK_TRUST_KEY = 'family…lock_t';
+
+  function getLockHash() { try { return localStorage.getItem(LOCK_HASH_KEY) || ''; } catch (e) { return ''; } }
+  function getTrust() { try { return localStorage.getItem(LOCK_TRUST_KEY) === '1'; } catch (e) { return false; } }
+
+  async function sha256Hex(text) {
+    var buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+    return Array.prototype.map.call(new Uint8Array(buf), function (b) { return ('0' + b.toString(16)).slice(-2); }).join('');
+  }
+
+  var _lockEl, _passEl, _okBtn, _errEl, _trustEl, _subEl;
+
+  function showLock(subText) {
+    _lockEl = document.getElementById('app-lock');
+    _passEl = document.getElementById('lock-pass');
+    _okBtn = document.getElementById('lock-ok');
+    _errEl = document.getElementById('lock-err');
+    _trustEl = document.getElementById('lock-trust');
+    _subEl = document.getElementById('lock-sub');
+    _subEl.textContent = subText || '请输入启动密码';
+    // 版本号 + 注册/到期信息（主脚本已暴露到 window）
+    try {
+      var _ver = document.getElementById('lock-ver');
+      var _lic = document.getElementById('lock-lic');
+      var _AV = window.APP_VERSION || '';
+      if (_ver) _ver.textContent = _AV ? ('V' + _AV) : '';
+      if (_lic && typeof window.licenseInfo === 'function') {
+        var li = window.licenseInfo();
+        var contact = (typeof window.LICENSE_CONTACT === 'string') ? window.LICENSE_CONTACT : '';
+        if (li.status === 'registered') {
+          var expStr = (li.expire && li.expire.length === 8) ? (li.expire.slice(0,4) + '-' + li.expire.slice(4,6) + '-' + li.expire.slice(6,8)) : '';
+          _lic.textContent = '已注册' + (expStr ? ' · ' + expStr + ' 到期' : '') + (li.remain != null && li.remain >= 0 ? '（剩 ' + li.remain + ' 天）' : '');
+        } else {
+          _lic.textContent = '试用中 · 剩 ' + Math.max(0, li.remain) + ' 天 · ' + contact;
+        }
+      }
+    } catch (e) {}
+    _passEl.value = '';
+    _errEl.textContent = '';
+    var trusted = getTrust();
+    _trustEl.checked = trusted;
+    if (trusted) _passEl.placeholder = '免输入，直接确认';
+    _lockEl.style.display = 'flex';
+    if (!trusted) setTimeout(function () { try { _passEl.focus(); } catch (e) {} }, 100);
+  }
+
+  function hideLock() {
+    var el = document.getElementById('app-lock');
+    if (el) el.style.display = 'none';
+  }
+
+  async function tryUnlock() {
+    var hash = getLockHash();
+    var pin = (_passEl.value || '').trim();
+    var trusted = getTrust();
+    // 免输入模式：无需密码，直接放行（若用户改勾掉了免输，则仍需密码）
+    if (trusted && !(_trustEl && !_trustEl.checked)) {
+      try { localStorage.setItem(LOCK_TRUST_KEY, '1'); } catch (e) {}
+      hideLock();
+      return;
+    }
+    var h = await sha256Hex('lock:' + pin);
+    if (h !== hash) {
+      _errEl.textContent = '密码不正确，请重试';
+      _passEl.value = '';
+      try { _passEl.focus(); } catch (e) {}
+      return;
+    }
+    // 密码正确：按勾选决定是否记住免输
+    try { localStorage.setItem(LOCK_TRUST_KEY, _trustEl && _trustEl.checked ? '1' : '0'); } catch (e) {}
+    hideLock();
+  }
+
+  function bindLock() {
+    _okBtn = document.getElementById('lock-ok');
+    _passEl = document.getElementById('lock-pass');
+    _okBtn.addEventListener('click', tryUnlock);
+    _passEl.addEventListener('keydown', function (e) { if (e.key === 'Enter') tryUnlock(); });
+  }
+
+  // 启动判定：设置了密码 → 显示锁（免输则预填态）
+  document.addEventListener('DOMContentLoaded', async function () {
+    var hash = getLockHash();
+    if (!hash) return; // 未设启动密码
+    bindLock();
+    showLock(getTrust() ? '已启用免输入，点击确认登录' : '请输入启动密码');
+  });
+
+  // ── 我的页：设置/修改/关闭启动密码（暴露到 window 供菜单调用） ──
+  window.appLock = {
+    isSet: function () { return !!getLockHash(); },
+    // 打开设置弹窗（复用 askBackupCreds 的样式风格：两遍输入确认）
+    openSetup: function () {
+      var ov = document.createElement('div');
+      ov.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:12001;display:flex;align-items:center;justify-content:center;';
+      var box = document.createElement('div');
+      box.style.cssText = 'background:#fff;border-radius:16px;padding:24px 22px;width:min(92vw,400px);box-shadow:0 12px 40px rgba(0,0,0,.3);color:#1c2333;';
+      var has = this.isSet();
+      box.innerHTML = '<div style="font-size:17px;font-weight:700;margin-bottom:4px;">' + (has ? '修改启动密码' : '设置启动密码') + '</div>' +
+        '<div style="font-size:12.5px;color:#6b7688;margin-bottom:10px;">4-8 位数字。打开 App 时需输入，防止他人随手查看。</div>';
+      function mk(l){ var x=document.createElement('label'); x.style.cssText='display:block;font-size:13px;font-weight:600;margin:12px 0 6px;color:#374151;'; x.textContent=l; return x; }
+      function inp(){ var i=document.createElement('input'); i.type='password'; i.inputMode='numeric'; i.maxLength=8; i.style.cssText='width:100%;padding:11px 13px;border:1px solid #e6eaf2;border-radius:10px;font-size:16px;letter-spacing:4px;text-align:center;box-sizing:border-box;'; return i; }
+      var cur = null, p1 = inp(), p2 = inp();
+      if (has) { box.appendChild(mk('当前密码')); cur = inp(); box.appendChild(cur); }
+      box.appendChild(mk('新密码')); box.appendChild(p1);
+      box.appendChild(mk('确认新密码')); box.appendChild(p2);
+      var msg = document.createElement('div'); msg.style.cssText = 'font-size:12.5px;margin-top:8px;color:#dc2626;min-height:18px;'; box.appendChild(msg);
+      var btns = document.createElement('div'); btns.style.cssText = 'display:flex;gap:10px;margin-top:14px;';
+      var ok = document.createElement('button'); ok.textContent = has ? '保存' : '开启'; ok.style.cssText = 'flex:1;padding:12px;border:none;border-radius:10px;background:#2563eb;color:#fff;font-size:14px;font-weight:600;cursor:pointer;';
+      var closeBtn = null;
+      if (has) { closeBtn = document.createElement('button'); closeBtn.textContent = '关闭启动密码'; closeBtn.style.cssText = 'flex:1;padding:12px;border:1px solid #e6eaf2;border-radius:10px;background:#fff;color:#b91c1c;font-size:14px;font-weight:600;cursor:pointer;'; }
+      var cancel = document.createElement('button'); cancel.textContent = '取消'; cancel.style.cssText = 'flex:1;padding:12px;border:1px solid #e6eaf2;border-radius:10px;background:#fff;color:#3b4252;font-size:14px;font-weight:600;cursor:pointer;';
+      btns.appendChild(ok); if (closeBtn) btns.appendChild(closeBtn); btns.appendChild(cancel); box.appendChild(btns);
+      ov.appendChild(box); document.body.appendChild(ov);
+      function close() { if (ov.parentNode) ov.parentNode.removeChild(ov); }
+      cancel.onclick = close;
+      if (closeBtn) closeBtn.onclick = async function () {
+        if (cur && cur.value) {
+          var curH = await sha256Hex('lock:' + cur.value.trim());
+          if (curH !== getLockHash()) { msg.textContent = '当前密码不正确'; return; }
+        }
+        try { localStorage.removeItem(LOCK_HASH_KEY); localStorage.removeItem(LOCK_TRUST_KEY); } catch (e) {}
+        close(); window.toast && toast('启动密码已关闭');
+        renderLockMenu();
+      };
+      ok.onclick = async function () {
+        var v1 = p1.value.trim(), v2 = p2.value.trim();
+        if (!/^\d{4,8}$/.test(v1)) { msg.textContent = '密码须为 4-8 位数字'; return; }
+        if (v1 !== v2) { msg.textContent = '两次输入的密码不一致'; return; }
+        if (has && cur) {
+          var curH = await sha256Hex('lock:' + cur.value.trim());
+          if (curH !== getLockHash()) { msg.textContent = '当前密码不正确'; return; }
+        }
+        var h = await sha256Hex('lock:' + v1);
+        try { localStorage.setItem(LOCK_HASH_KEY, h); localStorage.removeItem(LOCK_TRUST_KEY); } catch (e) {}
+        close(); window.toast && toast('启动密码已开启');
+        renderLockMenu();
+      };
+    }
+  };
+
+  // 我的页菜单行（放在“软件授权”之后）：动态注入
+  function renderLockMenu() {
+    var lic = document.querySelector('[data-action="go-license"]');
+    if (!lic || document.getElementById('lock-menu-row')) return;
+    var row = document.createElement('div');
+    row.className = 'card flat row-between';
+    row.id = 'lock-menu-row';
+    row.style.cursor = 'pointer';
+    row.setAttribute('data-action', 'app-lock-setup');
+    var on = !!getLockHash();
+    row.innerHTML = '<span style="display:flex;align-items:center;gap:10px;">' +
+      '<svg viewBox="0 0 24 24" style="width:19px;height:19px;stroke:var(--accent);fill:none;stroke-width:1.7;"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>' +
+      '启动密码</span>' +
+      '<span class="meta" id="lock-status">' + (on ? '已开启 ›' : '未开启 ›') + '</span>';
+    lic.parentNode.insertBefore(row, lic.nextSibling);
+  }
+  // 启动时注入菜单
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', renderLockMenu);
+  } else { renderLockMenu(); }
+
+  // 点击路由接管
+  document.addEventListener('click', function (e) {
+    var t = e.target.closest && e.target.closest('[data-action="app-lock-setup"]');
+    if (t) { window.appLock.openSetup(); }
+  });
+})();
+</script>
+
 </body>
 </html>
