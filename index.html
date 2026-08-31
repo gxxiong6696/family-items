@@ -467,6 +467,12 @@
     .date-stepper .ds-btn{flex:1;min-width:50px;padding:6px 0;border:1px solid var(--border,#e6e7eb);background:var(--card,#f4f5f7);border-radius:8px;font-size:12px;line-height:1;color:var(--text,#333);cursor:pointer;-webkit-tap-highlight-color:transparent;transition:background .15s, transform .05s;}
     .date-stepper .ds-btn:active{transform:scale(.96);background:var(--muted,#eceef1);}
     .date-stepper .ds-btn.ds-today{min-width:58px;}
+    /* 数量 +/− 步进（V9.9）：编辑窗口与拍照确认页共用 */
+    .qty-line{display:flex;gap:8px;align-items:stretch;}
+    .qty-line .input{flex:1;min-width:0;}
+    .qty-stepper{display:flex;gap:6px;flex:0 0 auto;}
+    .qty-btn{width:40px;border:1px solid var(--border,#e6e7eb);background:var(--card,#f4f5f7);border-radius:8px;font-size:18px;line-height:1;color:var(--text,#333);cursor:pointer;-webkit-tap-highlight-color:transparent;transition:background .15s, transform .05s;display:flex;align-items:center;justify-content:center;}
+    .qty-btn:active{transform:scale(.94);background:var(--muted,#eceef1);}
     /* 详情页无照片时：点击拍照添加 */
     #dt-photo.dt-photo-empty { position: relative; border: 1.5px dashed var(--line, rgba(255,255,255,.2)); background: var(--surface, #1a1a1a) !important; color: var(--muted, #9a9a9a); }
     #dt-photo.dt-photo-empty .dt-photo-add { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; cursor: pointer; user-select: none; color: var(--muted, #9a9a9a); font-weight: 600; }
@@ -706,6 +712,7 @@
           <div class="loc-mode-switch" role="tablist" aria-label="位置页模式">
             <button type="button" class="loc-mode-btn active" data-loc-mode="query" aria-selected="true">查询</button>
             <button type="button" class="loc-mode-btn" data-loc-mode="edit" aria-selected="false">编辑</button>
+            <button type="button" class="loc-mode-btn" data-loc-collapse="fold" aria-selected="false" style="flex: 0 0 auto; min-width: 72px; color: var(--accent-deep, #3f5c3b); border-color: var(--accent-soft, #dfe8dc);">折叠</button>
           </div>
 
           <section class="pad stack" style="gap: 10px;">
@@ -858,10 +865,9 @@
 
           <section class="pad" style="margin-bottom: 8px;">
             <div class="row" style="overflow-x: auto; padding-bottom: 4px;">
-              <span class="tag active">药品效期</span>
-              <span class="tag">保修到期</span>
-              <span class="tag">借出归还</span>
-              <span class="tag">已处理</span>
+              <span class="tag active" data-remtab="drug">药品效期</span>
+              <span class="tag" data-remtab="food">食品保质期</span>
+              <span class="tag" data-remtab="appliance">家电保修</span>
             </div>
           </section>
 
@@ -1056,7 +1062,7 @@
 
           <section class="pad" style="padding: 18px 20px; text-align: center;">
             <button class="shutter-btn" aria-label="拍摄" id="shutter-scan"></button>
-            <p class="meta" style="margin-top: 10px;">拍摄后将自动识别物品信息</p>
+            <p class="meta" style="margin-top: 10px;">拍摄后快速填写入库</p>
           </section>
         </section>
 
@@ -1064,7 +1070,7 @@
         <section class="page" id="page-scanning" data-od-id="page-scanning">
           <div class="flow-bar">
             <button class="back-btn" aria-label="返回" data-action="go-scan"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>
-            <div class="flow-title">智能识别中</div>
+            <div class="flow-title">正在处理照片…</div>
             <div class="progress-dots" style="margin: 0 0 0 auto; gap: 4px;"><span class="on"></span><span class="on"></span><span></span></div>
           </div>
 
@@ -1079,7 +1085,7 @@
               <div class="skeleton" style="width: 160px; height: 16px; margin: 0 auto 8px;"></div>
               <div class="skeleton" style="width: 220px; height: 12px; margin: 0 auto;"></div>
             </div>
-            <p class="meta" style="text-align: center; margin-top: 4px;" id="scan-status">正在识别名称、分类与存放建议…</p>
+            <p class="meta" style="text-align: center; margin-top: 4px;" id="scan-status">正在生成照片…</p>
             <button class="btn-secondary" style="min-height: 44px; font-size: 13px;" data-action="go-scan-error">识别失败？手动填写</button>
           </section>
         </section>
@@ -1155,12 +1161,34 @@
             <div class="grid-2">
               <div class="field">
                 <label for="f-qty">数量</label>
-                <div class="input editable" id="f-qty" contenteditable="true" role="textbox" aria-multiline="false">1</div>
+                <div class="qty-line">
+                  <div class="input editable" id="f-qty" contenteditable="true" role="textbox" aria-multiline="false">1</div>
+                  <div class="qty-stepper">
+                    <button type="button" class="qty-btn" data-qty-target="f-qty" data-qty-delta="-1">−</button>
+                    <button type="button" class="qty-btn" data-qty-target="f-qty" data-qty-delta="1">+</button>
+                  </div>
+                </div>
               </div>
               <div class="field">
                 <label for="f-tag">标签</label>
                 <div class="input editable" id="f-tag" contenteditable="true" role="textbox" aria-multiline="false">常用</div>
               </div>
+            </div>
+
+            <div class="field">
+              <label for="f-exp">有效期至<span style="font-weight:400;color:var(--muted);">（药品/食品建议填写）</span></label>
+              <input type="date" class="input editable" id="f-exp" aria-label="有效期至" />
+              <div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap;">
+                <span class="tag" data-exp-adj="-30">-30天</span>
+                <span class="tag" data-exp-adj="-7">-7天</span>
+                <span class="tag" data-exp-adj="1">+1天</span>
+                <span class="tag" data-exp-adj="7">+7天</span>
+                <span class="tag" data-exp-adj="30">+30天</span>
+                <span class="tag" data-exp-adj="180">+6月</span>
+                <span class="tag" data-exp-adj="365">+1年</span>
+                <span class="tag" data-exp-adj="today">今天</span>
+              </div>
+              <div class="hint" id="f-exp-hint"><span class="conf">·</span> 填写后自动加入临期提醒（提前 30 天）</div>
             </div>
           </section>
 
@@ -1381,12 +1409,22 @@
             <div class="grid-2">
               <div class="field">
                 <label>数量</label>
-                <div class="input editable" id="ed-qty" contenteditable="true" role="textbox"></div>
+                <div class="qty-line">
+                  <div class="input editable" id="ed-qty" contenteditable="true" role="textbox"></div>
+                  <div class="qty-stepper">
+                    <button type="button" class="qty-btn" data-qty-target="ed-qty" data-qty-delta="-1">−</button>
+                    <button type="button" class="qty-btn" data-qty-target="ed-qty" data-qty-delta="1">+</button>
+                  </div>
+                </div>
               </div>
               <div class="field">
                 <label>标签</label>
                 <div class="input editable" id="ed-tags" contenteditable="true" role="textbox"></div>
               </div>
+            </div>
+            <div class="row" style="gap: 10px; margin-top: 6px;">
+              <button class="btn-primary" id="save-item-edit" style="flex: 1;">保存修改</button>
+              <button class="btn-secondary" id="cancel-item-edit" style="flex: 0 0 auto;">取消</button>
             </div>
             <div class="grid-2">
               <div class="field">
@@ -1405,10 +1443,6 @@
             <div class="field">
               <label>备注</label>
               <div class="input editable" id="ed-note" contenteditable="true" role="textbox"></div>
-            </div>
-            <div class="row" style="gap: 10px; margin-top: 6px;">
-              <button class="btn-primary" id="save-item-edit" style="flex: 1;">保存修改</button>
-              <button class="btn-secondary" id="cancel-item-edit" style="flex: 0 0 auto;">取消</button>
             </div>
           </section>
 
@@ -3014,6 +3048,21 @@
     return b;
   }
   var LOC_VIEW_SVG = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span>查看</span>';
+  // V10.3：一键折叠/展开所有二级位置
+  (function bindLocCollapse() {
+    document.addEventListener('click', function (e) {
+      var b = e.target.closest ? e.target.closest('[data-loc-collapse]') : null;
+      if (!b) return;
+      var nodes = document.querySelectorAll('#page-locations .loc-node');
+      var anyOpen = false;
+      nodes.forEach(function (n) { if (n.classList.contains('open')) anyOpen = true; });
+      var fold = anyOpen;
+      nodes.forEach(function (n) { n.classList.toggle('open', !fold); });
+      b.textContent = fold ? '展开' : '折叠';
+      b.setAttribute('data-loc-collapse', fold ? 'unfold' : 'fold');
+    });
+  })();
+
   // 给房间头注入「查看」入口（查询态显示）：聚合查看整个房间及其子位的物品
   function injectLocViewButtons() {
     document.querySelectorAll('#page-locations .loc-node > .loc-head').forEach(function (headEl) {
@@ -3287,8 +3336,56 @@
     var y = d.getFullYear(), m = ('0' + (d.getMonth() + 1)).slice(-2), dd = ('0' + d.getDate()).slice(-2);
     return y + '-' + m + '-' + dd;
   }
+  // V9.9：数量 +/− 步进（编辑窗口 & 拍照确认页共用，事件委托）
+  (function bindQtySteppers() {
+    document.addEventListener('click', function (e) {
+      var b = e.target.closest ? e.target.closest('.qty-btn') : null;
+      if (!b) return;
+      var id = b.getAttribute('data-qty-target');
+      var el = id ? document.getElementById(id) : null;
+      if (!el) return;
+      var delta = parseInt(b.getAttribute('data-qty-delta'), 10) || 0;
+      var cur = parseInt((el.textContent || '').replace(/[^0-9]/g, ''), 10);
+      if (isNaN(cur)) cur = 1;
+      var next = Math.max(1, cur + delta);
+      el.textContent = String(next);
+      try { el.dispatchEvent(new Event('input', { bubbles: true })); } catch (x) {}
+    });
+  })();
+
+  // V9.9：确认页有效期快捷标签委托（-30天/-7天/+1天/+7天/+30天/+6月/+1年/今天）
+  (function bindExpAdj() {
+    function shiftDays(base, days) {
+      var d = base ? new Date(base + 'T00:00:00') : new Date();
+      if (isNaN(d.getTime())) d = new Date();
+      d.setDate(d.getDate() + days);
+      return dateToYYYYMMDD(d);
+    }
+    document.addEventListener('click', function (e) {
+      var t = e.target.closest ? e.target.closest('[data-exp-adj]') : null;
+      if (!t) return;
+      var inp = document.getElementById('f-exp');
+      if (!inp) return;
+      var v = t.getAttribute('data-exp-adj');
+      if (v === 'today') { inp.value = dateToYYYYMMDD(new Date()); }
+      else {
+        var days = parseInt(v, 10) || 0;
+        inp.value = shiftDays(inp.value, days);
+      }
+      try { inp.dispatchEvent(new Event('change', { bubbles: true })); } catch (x) {}
+      var hint = document.getElementById('f-exp-hint');
+      if (hint) {
+        var _d = inp.value ? new Date(inp.value + 'T00:00:00') : null;
+        if (_d && !isNaN(_d.getTime())) {
+          var _days = Math.round((_d.getTime() - new Date().setHours(0,0,0,0)) / 86400000);
+          hint.textContent = _days < 0 ? '该日期已过期 ' + Math.abs(_days) + ' 天' : (_days === 0 ? '今天到期' : '将提前 30 天提醒');
+        }
+      }
+    });
+  })();
+
   function initDateSteppers() {
-    ['m-prod', 'm-exp', 'ed-prod', 'ed-exp'].forEach(function (id) {
+    ['m-prod', 'm-exp', 'ed-prod', 'ed-exp', 'f-exp'].forEach(function (id) {
       var inp = document.getElementById(id);
       if (!inp || inp.__stepperBound) return;
       inp.__stepperBound = true;
@@ -3381,7 +3478,7 @@
       cat = oldCategory || '物品';
     }
     var isDateCat = !!CAT_WITH_DATE[cat];
-    var cur = { name: newName, category: cat, loc: loc, qty: qty, tags: tags, prod: prod, exp: exp, batch: batch, note: note, badge: isDateCat ? (old.badge || 'ok') : 'ok', badgeText: isDateCat ? (old.badgeText || '正常') : '正常', added: (old.meta || '').replace(/^.*添加于\s*/, ''), member: (old.meta || '').match(/@(\w+)/) ? (old.meta.match(/@(\w+)/)[1]) : '1', photo: oldPhoto };
+    var cur = { name: newName, category: cat, loc: loc, qty: qty, tags: tags, prod: prod, exp: exp, batch: batch, note: note, badge: isDateCat ? (old.badge || 'ok') : 'ok', badgeText: isDateCat ? (old.badgeText || '正常') : '正常', added: (((old.meta || '').match(/添加于\s*([\d-]+)/)) || [])[1] || '', member: (old.meta || '').match(/@(\w+)/) ? (old.meta.match(/@(\w+)/)[1]) : '1', photo: oldPhoto };
     // 持久化到 localStorage（用户物品 + 演示物品都可编辑保存）
     // 若改名（newName !== 旧名），先把旧名从数据源剔除，旧名加入删除清单，避免刷新后“旧名复活”
     if (newName !== _viewingItem) {
@@ -3400,7 +3497,32 @@
     _viewingItem = newName;
     fillDetail(newName);
     resetDetailEditMode();
-    toast('已更新');
+    showSavedOverlay();          // V10.1：全屏"保存成功"，点击返回上一页
+  }
+
+  // V10.1：保存成功确认层（大按钮，点击返回物品列表）
+  function showSavedOverlay() {
+    var old = document.getElementById('saved-ok-overlay'); if (old) old.remove();
+    var ov = document.createElement('div');
+    ov.id = 'saved-ok-overlay';
+    ov.innerHTML =
+      '<div class="lic-mask"></div>' +
+      '<div class="lic-box">' +
+        '<div style="font-size:40px;line-height:1;color:var(--accent,#5F7F5A);margin-bottom:10px;">✓</div>' +
+        '<div class="lic-title">保存成功</div>' +
+        '<div class="lic-sub">物品信息已更新</div>' +
+        '<div class="lic-btns"><button class="lic-btn-primary" id="saved-ok-back">保存成功，返回上一页</button></div>' +
+      '</div>';
+    document.body.appendChild(ov);
+    var style = document.createElement('style');
+    style.textContent = '#saved-ok-overlay .lic-mask{position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:10000}#saved-ok-overlay .lic-box{position:fixed;z-index:10001;left:50%;top:50%;transform:translate(-50%,-50%);width:min(88vw,360px);background:#fff;border-radius:16px;padding:26px 22px 20px;box-shadow:0 20px 60px rgba(0,0,0,.25);text-align:center}#saved-ok-overlay .lic-title{font-size:19px;font-weight:700;margin-bottom:4px}#saved-ok-overlay .lic-sub{color:#6b7688;font-size:12.5px;margin-bottom:16px}#saved-ok-overlay .lic-btn-primary{width:100%;padding:13px;border:none;border-radius:10px;background:var(--accent,#5F7F5A);color:#fff;font-size:15px;font-weight:600;cursor:pointer}';
+    document.head.appendChild(style);
+    ov.querySelector('#saved-ok-back').addEventListener('click', function(){
+      ov.remove();
+      resetDetailEditMode();
+      showPage('page-items');
+    });
+    ov.querySelector('.lic-mask').addEventListener('click', function(){ ov.remove(); });
   }
 
   /* ── toast ── */
@@ -3620,6 +3742,9 @@
   }
   // 导入时批量压缩超大照片，避免整套数据顶到 localStorage 配额
   async function compressForImport(list) {
+    // V10.6：导入大备份（如专业版原图包）时压缩照片，显示进度
+    var big = (list || []).filter(function (it) { return it && it.photo && it.photo.length > 60000; }).length;
+    if (big > 0) toast('检测到 ' + big + ' 张大照片，正在压缩导入（请稍候）…');
     var out = [];
     for (var i = 0; i < list.length; i++) {
       var it = list[i];
@@ -3628,6 +3753,7 @@
       }
       out.push(it);
     }
+    if (big > 0) toast('照片压缩完成');
     return out;
   }
   // ── 容量自适应保存：localStorage 快满时自动降低全部照片质量重试，避免"存不了" ──
@@ -3679,41 +3805,30 @@
     stopCamera();
     inFlow = true;
     showPage('page-scanning');
-    var _st = document.getElementById('scan-status'); if (_st) _st.textContent = '正在加载识别模型…';
-    ensureRecognitionModel(function (ok) {
-      var _st2 = document.getElementById('scan-status'); if (_st2) _st2.textContent = ok ? '正在识别物品信息…' : '识别模型加载失败，请检查网络后重试';
-      recognizeItem(frame, function (res) {
-        var img = document.getElementById('scan-confirm-ph');
-        if (img) {
-          img.textContent = ''; img.style.display = 'block'; img.style.background = '';
-          if (frame) { img.src = frame; img.style.backgroundSize = 'cover'; img.style.backgroundImage = 'url(' + frame + ')'; img.style.backgroundPosition = 'center'; }
-        }
-        var nameEl = document.getElementById('f-name');
-        if (res && res.category && res.category !== '其他') {
-          var theName = '';
-          if (res.name) { theName = res.name.split(',')[0].trim(); }
-          else { theName = res.category; }
-          if (nameEl) nameEl.textContent = theName || '待填写';
-          if (typeof syncFnameClear === 'function') syncFnameClear();
-          var sName = document.getElementById('scan-confirm-name'); if (sName) sName.textContent = theName || '——';
-          var sStatus = document.getElementById('scan-confirm-status'); if (sStatus) sStatus.textContent = '已识别为「' + res.category + '」';
-          var sTip = document.getElementById('scan-confirm-tip'); if (sTip) sTip.textContent = '请在下方确认或修改信息后保存';
-          var hintEl = document.getElementById('f-name-hint'); if (hintEl) hintEl.innerHTML = '<span class="conf">✓ 已识别</span> · 点击可修改';
-          var tags = document.querySelectorAll('#page-scan-confirm .field .row .tag');
-          tags.forEach(function (t) { t.classList.remove('active'); });
-          tags.forEach(function (t) { if (t.textContent.trim() === res.category) t.classList.add('active'); });
-        } else {
-          if (nameEl) nameEl.textContent = '待填写';
-          if (typeof syncFnameClear === 'function') syncFnameClear();
-          var sName2 = document.getElementById('scan-confirm-name'); if (sName2) sName2.textContent = '未识别到物品';
-          var sStatus2 = document.getElementById('scan-confirm-status'); if (sStatus2) sStatus2.textContent = '未识别到物品';
-          var sTip2 = document.getElementById('scan-confirm-tip'); if (sTip2) sTip2.textContent = '请在下方手动填写物品信息，或重新拍摄';
-          var hint2 = document.getElementById('f-name-hint'); if (hint2) hint2.innerHTML = '<span class="conf">·</span> 未识别，请手动填写';
-        }
-        showPage('page-scan-confirm');
-      });
-    });
+    // V9.9：纯拍照入库——照片已拿到，短暂过场后直达确认页
+    setTimeout(function () { renderScanConfirmV9(frame); }, 350);
   });
+
+  // V9.9 直通确认页：照片即拍即用，名称/类别由用户填写（无识别）
+  function renderScanConfirmV9(frameData) {
+    var img = document.getElementById('scan-confirm-ph');
+    if (img) {
+      img.textContent = ''; img.style.display = 'block'; img.style.background = '';
+      if (frameData) { img.src = frameData; img.style.backgroundSize = 'cover'; img.style.backgroundImage = 'url(' + frameData + ')'; img.style.backgroundPosition = 'center'; }
+    }
+    var nameEl = document.getElementById('f-name');
+    if (nameEl) nameEl.textContent = '待填写';
+    if (typeof syncFnameClear === 'function') syncFnameClear();
+    var sName = document.getElementById('scan-confirm-name'); if (sName) sName.textContent = '——';
+    var sStatus = document.getElementById('scan-confirm-status'); if (sStatus) sStatus.textContent = '照片已就绪，请填写物品信息';
+    var sTip = document.getElementById('scan-confirm-tip'); if (sTip) sTip.textContent = '填好名称、位置、数量后保存即可';
+    var hintEl = document.getElementById('f-name-hint'); if (hintEl) hintEl.innerHTML = '点击名称可直接输入';
+    var tags = document.querySelectorAll('#page-scan-confirm .field .row .tag');
+    tags.forEach(function (t) { t.classList.remove('active'); });
+    var otherTag = null;
+    tags.forEach(function (t) { if (t.textContent.trim() === '其他') otherTag = t; });
+    if (otherTag) otherTag.classList.add('active');
+  }
 
   document.getElementById('save-item-edit').addEventListener('click', function () { saveItemEdit(); });
   document.getElementById('cancel-item-edit').addEventListener('click', function () { resetDetailEditMode(); });
@@ -3768,14 +3883,29 @@
       nameEl.textContent = name;   // 确认页名称同步显示编号结果，所见即所得
       toast('库中已有「' + _dupTip + '」，已自动编号为「' + name + '」');
     }
+    var fexpEl = document.getElementById('f-exp');
+    var fexp = fexpEl && fexpEl.value ? fexpEl.value : '';
+    var badge = 'ok', badgeText = '正常';
+    if (fexp) {
+      var _p = fexp.split('-');
+      var _ed = (_p.length === 3) ? new Date(+_p[0], +_p[1] - 1, +_p[2]) : new Date(fexp);
+      if (!isNaN(_ed.getTime())) {
+        var _today = new Date(); _today.setHours(0, 0, 0, 0);
+        var _ed2 = new Date(_ed.getTime()); _ed2.setHours(0, 0, 0, 0);
+        var _days = Math.round((_ed2.getTime() - _today.getTime()) / 86400000);
+        if (_days < 0) { badge = 'danger'; badgeText = '已过期 ' + Math.abs(_days) + ' 天'; }
+        else if (_days === 0) { badge = 'danger'; badgeText = '今天到期'; }
+        else if (_days <= 30) { badge = 'warn'; badgeText = _days + ' 天'; }
+      }
+    }
     var _newItem = {
       name: name,
       category: cat,
       loc: savedLoc,
       qty: qtyEl ? qtyEl.textContent.trim() : '1',
       tags: tagEl ? tagEl.textContent.trim() : '',
-      badge: 'ok', badgeText: '正常', added: dstr, member: '1',
-      note: '', prod: '—', exp: '—', batch: '—', photo: _shot
+      badge: badge, badgeText: badgeText, added: dstr, member: '1',
+      note: '', prod: '—', exp: fexp || '—', batch: '—', photo: _shot
     };
     var _arr = loadUserItems().filter(function (it) { return !(it && it.name === name); });
     _arr.unshift(_newItem);
@@ -3821,7 +3951,7 @@
     var user = loadUserItems();
     var seen = {};
     var result = [];
-    user.forEach(function (it) { if (it && it.name) { if (seen[it.name]) return; seen[it.name] = 1; var cat = it.category || '物品'; var loc = it.loc || '未设置'; if (!it.loc || it.loc === '未设置') { var _d = null; DEMO_ITEMS.some(function (x) { if (x.name === it.name) { _d = x; return true; } return false; }); if (_d && _d.loc) loc = _d.loc; } result.push({ name: it.name, badge: it.badge || 'ok', badgeText: it.badgeText || '正常', meta: it.meta || (it.added ? cat + ' · 添加于 ' + it.added : ''), loc: loc, qty: it.qty || '1', cat: cat, photo: it.photo || '' }); } });
+    user.forEach(function (it) { if (it && it.name) { if (seen[it.name]) return; seen[it.name] = 1; var cat = it.category || '物品'; var loc = it.loc || '未设置'; if (!it.loc || it.loc === '未设置') { var _d = null; DEMO_ITEMS.some(function (x) { if (x.name === it.name) { _d = x; return true; } return false; }); if (_d && _d.loc) loc = _d.loc; } result.push({ name: it.name, badge: it.badge || 'ok', badgeText: it.badgeText || '正常', meta: it.meta || (it.added ? cat + ' · 添加于 ' + it.added : ''), loc: loc, qty: it.qty || '1', cat: cat, exp: it.exp || '', photo: it.photo || '' }); } });
     DEMO_ITEMS.forEach(function (d) { if (!seen[d.name] && deleted.indexOf(d.name) < 0) { result.push({ name: d.name, badge: d.badge, badgeText: d.badgeText, meta: d.meta, loc: d.loc, qty: d.qty, cat: d.cat, photo: '' }); } });
     return result;
   }
@@ -4014,8 +4144,17 @@
   // 计算距目标日期的剩余天数（负数=已过期）；无效日期返回 null
   function daysUntil(dateStr) {
     if (!dateStr) return null;
-    var d = new Date(dateStr);
-    if (isNaN(d.getTime())) return null;
+    // V9.9：本地日历日解析（手动 split 构造 Date，避免 UTC 偏移导致的差一天）
+    var parts = String(dateStr).split(/[-\/]/);
+    var d;
+    if (parts.length === 3) {
+      var y = parseInt(parts[0], 10), m = parseInt(parts[1], 10) - 1, dd = parseInt(parts[2], 10);
+      if (isNaN(y) || isNaN(m) || isNaN(dd)) return null;
+      d = new Date(y, m, dd);
+    } else {
+      d = new Date(dateStr);
+      if (isNaN(d.getTime())) return null;
+    }
     var today = new Date(); today.setHours(0, 0, 0, 0);
     d.setHours(0, 0, 0, 0);
     return Math.round((d.getTime() - today.getTime()) / 86400000);
@@ -4035,25 +4174,39 @@
     if (note.indexOf('保修') >= 0) return note;
     return null;
   }
-  // 重绘主页雷达区与提醒中心（数据驱动）
+  // 重绘主页雷达区与提醒中心（数据驱动）；V10.3：支持分页签视图
+  var REM_TAB_KEY = 'family…remtab';
+  function currentRemTab() { try { var v = localStorage.getItem(REM_TAB_KEY); return (v === 'food' || v === 'appliance') ? v : 'drug'; } catch (e) { return 'drug'; } }
+  (function bindRemTabs() {
+    document.addEventListener('click', function (e) {
+      var t = e.target.closest ? e.target.closest('[data-remtab]') : null;
+      if (!t) return;
+      document.querySelectorAll('#page-reminders [data-remtab]').forEach(function (x) { x.classList.remove('active'); });
+      t.classList.add('active');
+      try { localStorage.setItem(REM_TAB_KEY, t.getAttribute('data-remtab')); } catch (e2) {}
+      renderReminderCenter();
+    });
+  })();
   function renderReminderCenter() {
     var items = getAllItems();
-    var expiring = [], expired = [], warranty = [];
+    // V10.5：按类别分三组（药品/食品/家电），都以"有效期至"为准；其它类别带有效期的归入药品组兜底
+    var groups = { drug: { expiring: [], expired: [] }, food: { expiring: [], expired: [] }, appliance: { expiring: [], expired: [] } };
     items.forEach(function (it) {
-      // 只有“药品/食品”等带效期类别才参与临期/过期提醒（改类别后不再残留）
-      if (CAT_WITH_DATE[it.cat]) {
-        var exp = itemExp(it.name);
-        if (exp) {
-          var days = daysUntil(exp);
-          if (days !== null) {
-            if (days < 0) { expired.push({ name: it.name, loc: it.loc, days: days, exp: exp }); }
-            else if (days <= 30) { expiring.push({ name: it.name, loc: it.loc, days: days, exp: exp }); }
-          }
-        }
-      }
-      var w = itemWarrantyNote(it.name);
-      if (w) warranty.push({ name: it.name, loc: it.loc, note: w });
+      var exp = it.exp && it.exp !== '—' && it.exp !== '-' ? it.exp : itemExp(it.name);
+      if (!exp) return;
+      var days = daysUntil(exp);
+      if (days === null) return;
+      var cat = String(it.cat || it.category || '');
+      var g = 'drug';
+      if (cat.indexOf('食品') >= 0) g = 'food';
+      else if (cat.indexOf('家电') >= 0) g = 'appliance';
+      var rec = { name: it.name, loc: it.loc, days: days, exp: exp };
+      if (days < 0) groups[g].expired.push(rec);
+      else if (days <= 30) groups[g].expiring.push(rec);
     });
+    var drugE = groups.drug.expired, drugN = groups.drug.expiring;
+    var foodE = groups.food.expired, foodN = groups.food.expiring;
+    var appE = groups.appliance.expired, appN = groups.appliance.expiring;
     // 雷达区
     var radarRows = document.getElementById('radar-rows');
     var radarSub = document.getElementById('radar-sub');
@@ -4069,24 +4222,29 @@
         row.querySelector('.r-date').textContent = dateText;
         radarRows.appendChild(row);
       }
-      var total30 = expiring.length, totalExp = expired.length;
+      var total30 = drugN.length + foodN.length, totalExp = drugE.length + foodE.length;
       if (total30 + totalExp === 0) {
         radarRows.innerHTML = '<div style="font-size:12px;color:rgba(255,255,255,.85);padding:6px 0;">暂无临期药品</div>';
       } else {
-        expired.slice(0, 3).forEach(function (r) { mkRow(r, '#F06B5E', '过期 ' + Math.abs(r.days) + ' 天'); });
-        expiring.slice(0, 3).forEach(function (r) { mkRow(r, '#F2C14E', '剩 ' + r.days + ' 天'); });
+        drugE.concat(foodE).slice(0, 3).forEach(function (r) { mkRow(r, '#F06B5E', '过期 ' + Math.abs(r.days) + ' 天'); });
+        drugN.concat(foodN).slice(0, 3).forEach(function (r) { mkRow(r, '#F2C14E', '剩 ' + r.days + ' 天'); });
       }
       if (radarSub) radarSub.textContent = total30 + totalExp + ' 件药品 30 天内到期' + (totalExp ? '，' + totalExp + ' 件已过期' : '');
     }
     // 提醒中心
     var list = document.getElementById('reminder-list');
     var greeting = document.getElementById('reminder-greeting');
+    var remTab = currentRemTab();
     if (list) {
-      var total = expired.length + expiring.length + warranty.length;
-      if (greeting) greeting.textContent = total + ' 条待处理';
+      var GV = { drug: { e: drugE, n: drugN, t: '药品效期', sub: '有效期至' },
+                 food: { e: foodE, n: foodN, t: '食品保质期', sub: '保质期至' },
+                 appliance: { e: appE, n: appN, t: '家电保修', sub: '保修至' } };
+      var cur = GV[remTab] || GV.drug;
+      var gTotal = cur.e.length + cur.n.length;
+      if (greeting) greeting.textContent = gTotal + ' 条待处理';
       list.innerHTML = '';
-      if (total === 0) {
-        list.innerHTML = '<div class="card" style="border-left:0;"><div class="empty-state"><div class="empty-icon"><svg viewBox="0 0 24 24"><path d="M12 3l8 4v5c0 4.5-3.2 7.8-8 9-4.8-1.2-8-4.5-8-9V7z"/><path d="M9 12l2 2 4-4"/></svg></div><h3>暂无待处理提醒</h3><p>所有物品都在有效期内。</p></div></div>';
+      if (gTotal === 0) {
+        list.innerHTML = '<div class="card" style="border-left:0;"><div class="empty-state"><h3>暂无待处理提醒</h3><p>此类物品都在有效期内。过期或过期的物品处理后，从物品库删除即可。</p></div></div>';
         return;
       }
       function card(title, pill, pillStyle, rows) {
@@ -4103,7 +4261,6 @@
             '<span class="num c-days" style="color:var(--warn);font-weight:600;"></span></div>';
         });
         c.innerHTML = head + body;
-        // 填充各行数据（用明确 class，避免误触 item-thumb 图标）
         var els = c.querySelectorAll('.row');
         rows.forEach(function (r, i) {
           var el = els[i];
@@ -4120,9 +4277,8 @@
         });
         list.appendChild(c);
       }
-      if (expired.length) card('已过期', '已过期', 'background:var(--danger-soft);color:var(--danger);', expired.map(function (r) { return { name: r.name, loc: r.loc, days: r.days, dateSuffix: '已于 ' + (r.exp || '') + ' 过期' }; }));
-      if (expiring.length) card('30 天内', '30 天内', 'background:var(--warn-soft);color:var(--warn);', expiring.map(function (r) { return { name: r.name, loc: r.loc, days: r.days, dateSuffix: '有效期至 ' + (r.exp || '') }; }));
-      if (warranty.length) card('保修', '保修', '', warranty.map(function (r) { return { name: r.name, loc: r.loc, dateSuffix: r.note.replace(/保修/, '保修至'), noteNum: '留意' }; }));
+      if (cur.e.length) card('已过期', '已过期', 'background:var(--danger-soft);color:var(--danger);', cur.e.map(function (r) { return { name: r.name, loc: r.loc, days: r.days, dateSuffix: '已于 ' + (r.exp || '') + ' 过期' }; }));
+      if (cur.n.length) card('30 天内', '30 天内', 'background:var(--warn-soft);color:var(--warn);', cur.n.map(function (r) { return { name: r.name, loc: r.loc, days: r.days, dateSuffix: cur.sub + ' ' + (r.exp || '') }; }));
     }
   }
 
@@ -4510,7 +4666,7 @@
   }
 
   /* ═══════════ 关于本软件 ═══════════ */
-  var APP_VERSION = '9.8';
+  var APP_VERSION = '10.6';
   window.APP_VERSION = APP_VERSION;   // 暴露给锁屏等外部脚本
   var APP_AUTHOR = 'Peter.Xiong';
   var APP_MAKER = '智普 AutoClaw 的设计专家系统';
