@@ -2045,7 +2045,7 @@
           });
           toast('合并中：2/4 保存物品…');
           items = dedupeItems(await compressForImport(merged));
-          if (!saveUserItems(items)) { toast('导入失败：数据过大，本地存储空间不足，请清理后重试'); return false; }
+          var _si = await saveUserItemsResilient(items); if (!_si.ok) { toast('导入失败：数据过大，本地存储空间不足，请清理后重试'); return false; } if (_si.downgraded) toast('存储空间紧张，照片已自动压缩后保存');
           toast('合并中：3/4 位置与成员…');
           // 位置并集：全名（父 · 名）去重
           var locMap = {};
@@ -2087,7 +2087,7 @@
           if (members) saveMembers(members);
           items = await compressForImport(items || []);
           items = dedupeItems(items);
-          if (!saveUserItems(items)) { toast('导入失败：数据过大，本地存储空间不足，请清理后重试'); return false; }
+          var _si = await saveUserItemsResilient(items); if (!_si.ok) { toast('导入失败：数据过大，本地存储空间不足，请清理后重试'); return false; } if (_si.downgraded) toast('存储空间紧张，照片已自动压缩后保存');
           saveLocations(locs || []); saveDeletedLocs(delLocs || []); saveLocRenamed(locRens || {});
           var keep = (items || []).map(function (it) { return it.name; });
           var del = (delItems || []).slice();
@@ -2097,12 +2097,12 @@
         }
       } else if (Array.isArray(obj)) {
         obj = dedupeItems(await compressForImport(obj));
-        if (!saveUserItems(obj)) { toast('导入失败：数据过大，本地存储空间不足，请清理后重试'); return false; }
+        var _so = await saveUserItemsResilient(obj); if (!_so.ok) { toast('导入失败：数据过大，本地存储空间不足，请清理后重试'); return false; } if (_so.downgraded) toast('存储空间紧张，照片已自动压缩后保存');
         hideDemosNotIn(obj.map(function (it) { return it.name; }));
         toast('导入成功（识别为物品清单）');
       } else if (obj.items && Array.isArray(obj.items)) {
         obj.items = dedupeItems(await compressForImport(obj.items));
-        if (!saveUserItems(obj.items)) { toast('导入失败：数据过大，本地存储空间不足，请清理后重试'); return false; }
+        var _soi = await saveUserItemsResilient(obj.items); if (!_soi.ok) { toast('导入失败：数据过大，本地存储空间不足，请清理后重试'); return false; } if (_soi.downgraded) toast('存储空间紧张，照片已自动压缩后保存');
         hideDemosNotIn(obj.items.map(function (it) { return it.name; }));
         if (Array.isArray(obj.members)) saveMembers(obj.members);
         toast('导入成功');
