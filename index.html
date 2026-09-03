@@ -3308,7 +3308,13 @@
   }
 
   function saveItemEdit() {
+
     var newName = (document.getElementById('ed-name') ? document.getElementById('ed-name').textContent.trim() : _viewingItem) || _viewingItem;
+// 重名保护（V11.8）：改名后若与库中其他物品同名，阻止保存并提醒，避免覆盖原物品
+if (newName && newName !== _viewingItem && typeof ITEM_DETAILS !== 'undefined' && ITEM_DETAILS[newName]) {
+toast('已存在同名物品「' + newName + '」，本次未保存。请换一个名称，或先删除/合并原同名物品');
+return;
+}
     var loc = (document.getElementById('ed-loc') ? document.getElementById('ed-loc').value : '') || '未设置';
     var qty = (document.getElementById('ed-qty') ? document.getElementById('ed-qty').textContent.trim() : '') || '1';
     var tags = (document.getElementById('ed-tags') ? document.getElementById('ed-tags').textContent.trim() : '');
@@ -4617,7 +4623,7 @@ function renderItemLists() {    var items = getAllItems();
   }
 
   /* ═══════════ 关于本软件 ═══════════ */
-  var APP_VERSION = '11.7';
+  var APP_VERSION = '11.8';
   window.APP_VERSION = APP_VERSION;   // 暴露给锁屏等外部脚本
   var APP_AUTHOR = 'Peter.Xiong';
   var APP_MAKER = '智普 AutoClaw 的设计专家系统';
