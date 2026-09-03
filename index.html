@@ -476,6 +476,10 @@
     /* 详情页无照片时：点击拍照添加 */
     #dt-photo.dt-photo-empty { position: relative; border: 1.5px dashed var(--line, rgba(255,255,255,.2)); background: var(--surface, #1a1a1a) !important; color: var(--muted, #9a9a9a); }
     #dt-photo.dt-photo-empty .dt-photo-add { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; cursor: pointer; user-select: none; color: var(--muted, #9a9a9a); font-weight: 600; }
+    #dt-photo { position: relative; }
+    #dt-photo .dt-photo-replace { position: absolute; right: 8px; bottom: 8px; display: flex; align-items: center; gap: 5px; background: rgba(15,23,42,.62); color: #fff; border: 1px solid rgba(255,255,255,.4); border-radius: 14px; padding: 5px 11px; font-size: 12px; font-weight: 600; line-height: 1; cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent; backdrop-filter: blur(2px); }
+    #dt-photo .dt-photo-replace svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+    #dt-photo .dt-photo-replace:active { opacity: .8; }
 </style>
 </head>
 <body>
@@ -1168,6 +1172,12 @@
             </div>
 
             <div class="field">
+              <label for="f-price">单价（元/件）<span style="font-weight:400;color:var(--muted);">（可留空）</span></label>
+              <input type="number" class="input editable" id="f-price" min="0" step="0.01" placeholder="如 5.00" aria-label="单价（元/件）" />
+              <div class="hint">用于计算金额，仅本机保存</div>
+            </div>
+
+            <div class="field">
               <label for="f-exp">有效期至<span style="font-weight:400;color:var(--muted);">（药品/食品建议填写）</span></label>
               <input type="date" class="input editable" id="f-exp" aria-label="有效期至" />
               <div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap;">
@@ -1211,7 +1221,7 @@
 
           <section class="pad" style="padding: 18px 20px; text-align: center;">
             <button class="shutter-btn" aria-label="拍摄" id="shutter-med"></button>
-            <p class="meta" style="margin-top: 10px;">拍摄后确认并保存日期</p>
+            <p class="meta" style="margin-top: 10px;" id="shutter-med-meta">拍摄后确认并保存日期</p>
           </section>
         </section>
 
@@ -1242,6 +1252,10 @@
             <div class="card flat row-between">
               <span style="color: var(--muted);">数量</span>
               <span class="num" style="font-weight: 500;" id="dt-qty">2 盒</span>
+            </div>
+            <div class="card flat row-between">
+              <span style="color: var(--muted);">金额</span>
+              <span style="font-weight: 500;" id="dt-price">未填</span>
             </div>
             <div class="card flat row-between">
               <span style="color: var(--muted);">生产日期</span>
@@ -1302,6 +1316,10 @@
                 <div class="input editable" id="ed-tags" contenteditable="true" role="textbox"></div>
               </div>
             </div>
+            <div class="field">
+              <label for="ed-price">单价（元/件）<span style="font-weight:400;color:var(--muted);">（可留空）</span></label>
+              <input type="number" class="input editable" id="ed-price" min="0" step="0.01" placeholder="单件价格，可留空">
+            </div>
             <div class="row" style="gap: 10px; margin-top: 6px;">
               <button class="btn-primary" id="save-item-edit" style="flex: 1;">保存修改</button>
               <button class="btn-secondary" id="cancel-item-edit" style="flex: 0 0 auto;">取消</button>
@@ -1327,7 +1345,8 @@
           </section>
 
           <section class="pad stack" style="gap: 10px; margin-top: 16px;">
-            <button class="btn-primary" data-action="edit-item">编辑物品</button>
+            <button class="btn-primary" data-action="rebuy-item">再买一件</button>
+            <button class="btn-secondary" data-action="edit-item">编辑物品</button>
             <button class="btn-secondary" style="color: var(--danger);" data-action="delete-item">删除物品</button>
             <p class="meta" style="text-align: center;">管理员与成员可编辑 · 访客只读</p>
           </section>
@@ -1873,7 +1892,8 @@
           badge: it.badge || 'ok', badgeText: it.badgeText || '正常',
           meta: (it.category || '物品') + ' · 添加于 ' + (it.added || '') + (it.member ? ' · @' + it.member : ''),
           loc: loc, qty: it.qty || '1', prod: it.prod || '—', exp: it.exp || '—', batch: it.batch || '—',
-          tags: it.tags || '', note: it.note || '', photo: it.photo || ''
+          tags: it.tags || '', note: it.note || '', photo: it.photo || '',
+          unitPrice: normPrice(it.unitPrice)
         };
       }
     });
@@ -2017,7 +2037,7 @@
         var locRens = (obj.locRenames && typeof obj.locRenames === 'object') ? obj.locRenames : null;
         if (importMode === 'merge') {
           // ── 合并导入：物品按名合并（时间新者赢），位置/删除清单/成员取并集，改名映射合并 ──
-          var stats = { addedN: 0, updatedN: 0, keptN: 0 };
+          var stats = { addedN: 0, updatedN: 0, keptN: 0, priceDiffN: 0, priceTieN: 0 };
           toast('合并中：1/4 物品合并…');
           // 备份物品清洗：name 必须、其余字段给默认，防老版本备份形状差异
           (items || []).forEach(function (it) {
@@ -2029,6 +2049,7 @@
             it.badge = it.badge || 'ok';
             it.badgeText = it.badgeText || '正常';
             it.photo = it.photo || '';
+            it.unitPrice = normPrice(it.unitPrice);
           });
           var localItems = loadUserItems();
           var byName = {};
@@ -2039,10 +2060,13 @@
             var cur = byName[it.name];
             if (!cur) { merged.push(it); byName[it.name] = it; stats.addedN++; return; }
             var curT = itemStamp(cur), newT = itemStamp(it);
+            var _cp = normPrice(cur.unitPrice), _np = normPrice(it.unitPrice);
+            var _diff = (_cp > 0 && _np > 0 && _cp !== _np);
             if (newT > curT) {
               for (var i = 0; i < merged.length; i++) { if (merged[i] && merged[i].name === it.name) { merged[i] = it; break; } }
               stats.updatedN++;
-            } else { stats.keptN++; }
+              if (_diff) stats.priceDiffN = (stats.priceDiffN || 0) + 1;   // 新者赢 + 价格不同 → 计数（toast 汇总，不静默）
+            } else { stats.keptN++; if (_diff && newT === curT) stats.priceTieN = (stats.priceTieN || 0) + 1; }  // 平票保留本机且两价不同 → 也计数提示
           });
           toast('合并中：2/4 保存物品…');
           items = dedupeItems(await compressForImport(merged));
@@ -2087,12 +2111,16 @@
           // 家庭名：本机为空才采用备份的
           if (!family) { try { var _f = localStorage.getItem('FAMILY_KEY'); if (!_f && family !== '') localStorage.setItem('FAMILY_KEY', family); } catch (e) {} }
           toast('合并中：4/4 刷新界面…');
-          toast('合并完成：新增 ' + stats.addedN + ' 件 · 更新 ' + stats.updatedN + ' 件 · 保留 ' + stats.keptN + ' 件');
+          var _mergeTip = '合并完成：新增 ' + stats.addedN + ' 件 · 更新 ' + stats.updatedN + ' 件 · 保留 ' + stats.keptN + ' 件';
+          if (stats.priceDiffN > 0) _mergeTip += ' · ' + stats.priceDiffN + ' 件价格不同已按较新记录保留，可在详情修改';
+          if (stats.priceTieN > 0) _mergeTip += ' · ' + stats.priceTieN + ' 件价格不同且时间相同，保留本机，请留意详情';
+          toast(_mergeTip);
         } else {
           if (family !== '') { try { localStorage.setItem('FAMILY_KEY', family); } catch (e) {} }
           if (members) saveMembers(members);
           items = await compressForImport(items || []);
           items = dedupeItems(items);
+          (items || []).forEach(function (it) { if (it && typeof it === 'object') it.unitPrice = normPrice(it.unitPrice); });
           var _si = await saveUserItemsResilient(items); if (!_si.ok) { toast('导入失败：数据过大，本地存储空间不足，请清理后重试'); return false; } if (_si.downgraded) toast('存储空间紧张，照片已自动压缩后保存');
           saveLocations(locs || []); saveDeletedLocs(delLocs || []); saveLocRenamed(locRens || {});
           var keep = (items || []).map(function (it) { return it.name; });
@@ -2104,11 +2132,13 @@
         }
       } else if (Array.isArray(obj)) {
         obj = dedupeItems(await compressForImport(obj));
+        (obj || []).forEach(function (it) { if (it && typeof it === 'object') it.unitPrice = normPrice(it.unitPrice); });
         var _so = await saveUserItemsResilient(obj); if (!_so.ok) { toast('导入失败：数据过大，本地存储空间不足，请清理后重试'); return false; } if (_so.downgraded) toast('存储空间紧张，照片已自动压缩后保存');
         hideDemosNotIn(obj.map(function (it) { return it.name; }));
         toast('导入成功（识别为物品清单）');
       } else if (obj.items && Array.isArray(obj.items)) {
         obj.items = dedupeItems(await compressForImport(obj.items));
+        (obj.items || []).forEach(function (it) { if (it && typeof it === 'object') it.unitPrice = normPrice(it.unitPrice); });
         var _soi = await saveUserItemsResilient(obj.items); if (!_soi.ok) { toast('导入失败：数据过大，本地存储空间不足，请清理后重试'); return false; } if (_soi.downgraded) toast('存储空间紧张，照片已自动压缩后保存');
         hideDemosNotIn(obj.items.map(function (it) { return it.name; }));
         if (Array.isArray(obj.members)) saveMembers(obj.members);
@@ -2154,7 +2184,7 @@
     var family = null;
     try { family = localStorage.getItem('FAMILY_KEY'); } catch (e) {}
     var payload = {
-      __meta: { app: 'family-items', version: 2, exportedAt: new Date().toISOString() },
+      __meta: { app: 'family-items', version: 3, exportedAt: new Date().toISOString() },
       familyName: family || '',
       members: members,
       items: items,
@@ -3059,6 +3089,12 @@
     document.getElementById('dt-meta').textContent = resolveAddby(d.meta);
     document.getElementById('dt-loc').textContent = d.loc;
     document.getElementById('dt-qty').textContent = d.qty;
+    var _amt = calcAmount(d);
+    var _dpEl = document.getElementById('dt-price');
+    if (_dpEl) {
+      var _up = parseFloat(d.unitPrice) || 0;
+      _dpEl.textContent = (_amt == null) ? '未填' : fmtMoney(_amt) + '（单价 ¥' + _up.toFixed(2) + '）';
+    }
     document.getElementById('dt-prod').textContent = d.prod;
     document.getElementById('dt-exp').textContent = d.exp;
     document.getElementById('dt-batch').textContent = d.batch;
@@ -3086,27 +3122,8 @@
         ph.style.color = '';
       }
     }
-    // 无照片时：图片区显示“点击拍照添加”，点击即进入拍照
-    if (ph) {
-      var _ov = ph.querySelector('.dt-photo-add');
-      if (dPhoto) {
-        ph.classList.remove('dt-photo-empty');
-        ph.setAttribute('data-action', 'view-photo');
-        ph.style.cursor = 'zoom-in';
-        if (_ov) _ov.remove();
-      } else {
-        ph.classList.add('dt-photo-empty');
-        ph.setAttribute('data-action', 'add-item-photo');
-        ph.style.cursor = 'pointer';
-        if (!_ov) {
-          _ov = document.createElement('div');
-          _ov.className = 'dt-photo-add';
-          _ov.setAttribute('data-action', 'add-item-photo');
-          _ov.innerHTML = '<span style="font-size:36px;line-height:1;">+</span><div style="font-size:13px;margin-top:6px;">点击拍照添加</div>';
-          ph.appendChild(_ov);
-        }
-      }
-    }
+    // 照片区交互语义随页面状态切换：查看态=大图另存；编辑态=重新拍照替换；无照片=拍照添加（V12.1）
+    refreshPhotoAreaForMode();
   }
 
   /* ── 物品照片放大查看 + 另存为文件（V2.0） ── */
@@ -3185,6 +3202,44 @@
   var _viewingPhoto = '';
   var _scanDateItem = null, _scanReturnPage = 'page-home', _addPhotoItem = null;
   var CAT_WITH_DATE = { '药品': 1, '食品': 1 };
+  var _detailEditing = false;   // 详情页当前是否处于编辑态（V12.1：照片区点击语义随此切换）
+  // 依据当前页面状态刷新照片区的 data-action / 光标 / 浮层（V12.1）
+  function refreshPhotoAreaForMode() {
+    var ph = document.getElementById('dt-photo');
+    if (!ph) return;
+    var _has = !!_viewingPhoto;
+    var _ov = ph.querySelector('.dt-photo-add');
+    var _rp = ph.querySelector('.dt-photo-replace');
+    if (_rp) _rp.remove();
+    if (!_has) {
+      ph.classList.add('dt-photo-empty');
+      ph.setAttribute('data-action', 'add-item-photo');
+      ph.style.cursor = 'pointer';
+      if (!_ov) {
+        _ov = document.createElement('div');
+        _ov.className = 'dt-photo-add';
+        _ov.setAttribute('data-action', 'add-item-photo');
+        _ov.innerHTML = '<span style="font-size:36px;line-height:1;">+</span><div style="font-size:13px;margin-top:6px;">点击拍照添加</div>';
+        ph.appendChild(_ov);
+      }
+      return;
+    }
+    ph.classList.remove('dt-photo-empty');
+    if (_ov) _ov.remove();
+    if (_detailEditing) {
+      // 编辑态：点击照片 = 重新拍照替换（保留查看大图到查看态）
+      ph.setAttribute('data-action', 'replace-item-photo');
+      ph.style.cursor = 'pointer';
+      _rp = document.createElement('div');
+      _rp.className = 'dt-photo-replace';
+      _rp.setAttribute('data-action', 'replace-item-photo');
+      _rp.innerHTML = '<svg viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="14" rx="3"/><circle cx="12" cy="13" r="4"/><path d="M8 6l1.6-2.4a1 1 0 0 1 .85-.46h3.1a1 1 0 0 1 .85.46L16 6"/></svg>重新拍照';
+      ph.appendChild(_rp);
+    } else {
+      ph.setAttribute('data-action', 'view-photo');
+      ph.style.cursor = 'zoom-in';
+    }
+  }
 
   /* ── 日期快捷步进：快速调年/月，一键回今天 ── */
   function dateToYYYYMMDD(d) {
@@ -3277,14 +3332,19 @@
     var ft = document.getElementById('ed-tags'); if (ft) ft.textContent = d.tags ? d.tags.replace(/<[^>]*>/g, '') : '';
     var fp = document.getElementById('ed-prod'); if (fp) fp.value = (d.prod && d.prod !== '—') ? d.prod : '';
     var fe = document.getElementById('ed-exp'); if (fe) fe.value = (d.exp && d.exp !== '—') ? d.exp : '';
+    var fprice = document.getElementById('ed-price'); if (fprice) fprice.value = (parseFloat(d.unitPrice) > 0) ? d.unitPrice : '';
     var fb = document.getElementById('ed-batch'); if (fb) fb.textContent = (d.batch && d.batch !== '—') ? d.batch : '';
     var fn = document.getElementById('ed-note'); if (fn) fn.textContent = d.note || '';
     var views = document.getElementById('detail-views'); if (views) views.style.display = 'none';
     var form = document.getElementById('detail-edit-form'); if (form) form.style.display = 'block';
+    _detailEditing = true;
+    refreshPhotoAreaForMode();   // 编辑态：照片区切为「重新拍照替换」
   }
   function resetDetailEditMode() {
     var views = document.getElementById('detail-views'); if (views) views.style.display = 'block';
     var form = document.getElementById('detail-edit-form'); if (form) form.style.display = 'none';
+    _detailEditing = false;
+    refreshPhotoAreaForMode();   // 回到查看态：照片区恢复「点击查看大图并另存」
   }
   // 编辑物品保存后 —— 同步所有静态列表行（首页"最近添加" + "全部物品"页）
   function syncItemRow(oldName, newName, loc, qty) {
@@ -3299,6 +3359,7 @@
       if (subEl) {
         var sub = loc || d.loc || '';
         if (qty && qty !== '1') sub += ' · ' + qty;
+        var _synAmt = calcAmount(d); if (_synAmt != null) sub += ' · ' + fmtMoney(_synAmt);
         if (!sub) sub = d.meta || '';
         subEl.textContent = sub;
       }
@@ -3339,7 +3400,9 @@ return;
       cat = oldCategory || '物品';
     }
     var isDateCat = !!CAT_WITH_DATE[cat];
-    var cur = { name: newName, category: cat, loc: loc, qty: qty, tags: tags, prod: prod, exp: exp, batch: batch, note: note, badge: isDateCat ? (old.badge || 'ok') : 'ok', badgeText: isDateCat ? (old.badgeText || '正常') : '正常', added: (((old.meta || '').match(/添加于\s*([\d-]+)/)) || [])[1] || '', member: (old.meta || '').match(/@(\w+)/) ? (old.meta.match(/@(\w+)/)[1]) : '1', photo: oldPhoto };
+    var cur = { name: newName, category: cat, loc: loc, qty: qty, tags: tags, prod: prod, exp: exp, batch: batch, note: note,
+      unitPrice: normPrice((document.getElementById('ed-price') && document.getElementById('ed-price').value) || ''),
+      badge: isDateCat ? (old.badge || 'ok') : 'ok', badgeText: isDateCat ? (old.badgeText || '正常') : '正常', added: (((old.meta || '').match(/添加于\s*([\d-]+)/)) || [])[1] || '', member: (old.meta || '').match(/@(\w+)/) ? (old.meta.match(/@(\w+)/)[1]) : '1', photo: oldPhoto };
     // 持久化到 localStorage（用户物品 + 演示物品都可编辑保存）
     // 若改名（newName !== 旧名），先把旧名从数据源剔除，旧名加入删除清单，避免刷新后“旧名复活”
     if (newName !== _viewingItem) {
@@ -3384,6 +3447,167 @@ return;
       showPage('page-items');
     });
     ov.querySelector('.lic-mask').addEventListener('click', function(){ ov.remove(); });
+  }
+
+  /* ═══════════════ L1 V12.0 再买一件（补录）═══════════════ */
+  // 打开补录浮层：预填名称/位置/分类/最近单价；数量默认 1 可编辑；效期一律不预填
+  function openRebuyModal(name) {
+    var old = document.getElementById('rebuy-modal'); if (old) old.remove();
+    var items = loadUserItems();
+    var recent = null;
+    for (var _i = 0; _i < items.length; _i++) { if (items[_i] && items[_i].name === name) { recent = items[_i]; break; } }
+    var base = ITEM_DETAILS[name] || {};
+    var isDemoOnly = !recent;   // 无同名用户条目：纯演示（首次转真实）或演示 canonical
+    var loc = (recent && recent.loc) ? recent.loc : (base.loc || '未设置');
+    var cat = (recent && recent.category) ? recent.category : (base.cat || '其他');
+    var lastPrice = (recent && normPrice(recent.unitPrice)) ? recent.unitPrice : '';
+    var curQty = recent ? String(recent.qty || '1') : (isDemoOnly ? '' : '1');
+
+    var ov = document.createElement('div');
+    ov.id = 'rebuy-modal';
+    ov.innerHTML =
+      '<div class="lic-mask"></div>' +
+      '<div class="lic-box" style="text-align:left;">' +
+        '<div class="lic-title" style="margin-bottom:4px;">再买一件</div>' +
+        '<div style="color:#6b7688;font-size:12.5px;margin-bottom:14px;">补录本次实际买入量，将累加到现有记录</div>' +
+        '<div class="rebuy-row"><span class="rebuy-k">物品</span><span class="rebuy-v" id="rebuy-name">' + esc(name) + '</span></div>' +
+        (recent ? '<div class="rebuy-row"><span class="rebuy-k">现有数量</span><span class="rebuy-v" id="rebuy-cur">' + esc(String(curQty)) + '</span></div>' : '') +
+        (isDemoOnly ? '<div class="rebuy-note">“' + esc(name) + '”目前是示例数据：确认后将登记为真实物品（本次数量为准，不沿用示例数量）。</div>' : '') +
+        '<div class="rebuy-row"><span class="rebuy-k">存放位置</span><span class="rebuy-v">' + esc(loc) + '</span></div>' +
+        '<div class="rebuy-row"><span class="rebuy-k">分类</span><span class="rebuy-v">' + esc(cat) + '</span></div>' +
+        '<div style="margin-top:12px;"><label style="font-size:13px;color:#374151;font-weight:600;">本次数量（按实际入库量）</label>' +
+          '<div class="qty-line" style="margin-top:6px;">' +
+            '<div class="input editable" id="rebuy-qty" contenteditable="true" role="textbox">1</div>' +
+            '<div class="qty-stepper">' +
+              '<button type="button" class="qty-btn" data-rebuy-delta="-1">−</button>' +
+              '<button type="button" class="qty-btn" data-rebuy-delta="1">+</button>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+        '<div style="margin-top:12px;"><label style="font-size:13px;color:#374151;font-weight:600;">单价（元/件）<span style="font-weight:400;color:#9aa3b2;">可留空</span></label>' +
+          '<input type="number" class="input editable" id="rebuy-price" min="0" step="0.01" placeholder="与上次不同时将先询问" style="width:100%;box-sizing:border-box;margin-top:6px;" value="' + esc(String(lastPrice)) + '" />' +
+        '</div>' +
+        '<div style="color:#9aa3b2;font-size:12px;margin-top:10px;line-height:1.6;">有效期等其它信息保持不变；本补录不改变效期。</div>' +
+        '<div class="lic-btns" style="margin-top:16px;">' +
+          '<button class="lic-btn-primary" id="rebuy-ok" style="width:100%;padding:13px;border:none;border-radius:10px;background:var(--accent,#5F7F5A);color:#fff;font-size:15px;font-weight:600;cursor:pointer;">确认补录</button>' +
+          '<button class="lic-btn-plain" id="rebuy-cancel" style="width:100%;padding:12px;border:1px solid #e6eaf2;border-radius:10px;background:#fff;color:#3b4252;font-size:14px;margin-top:8px;cursor:pointer;">取消</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(ov);
+    var style = document.createElement('style');
+    style.textContent = '#rebuy-modal .lic-mask{position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:10000}#rebuy-modal .lic-box{position:fixed;z-index:10001;left:50%;top:50%;transform:translate(-50%,-50%);width:min(90vw,380px);background:#fff;border-radius:16px;padding:22px;box-shadow:0 20px 60px rgba(0,0,0,.25);max-height:88vh;overflow:auto}#rebuy-modal .rebuy-row{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid #f1f4f9;font-size:13.5px}#rebuy-modal .rebuy-k{color:#6b7688;flex:0 0 auto}#rebuy-modal .rebuy-v{color:#0f172a;font-weight:600;text-align:right;word-break:break-all}#rebuy-modal .rebuy-note{background:#fff8e6;border:1px solid #f5e3b3;color:#8a6d1a;font-size:12.5px;padding:8px 10px;border-radius:8px;margin:10px 0;line-height:1.6}';
+    document.head.appendChild(style);
+    document.getElementById('rebuy-cancel').addEventListener('click', function () { ov.remove(); });
+    ov.querySelector('.lic-mask').addEventListener('click', function () { ov.remove(); });
+    document.getElementById('rebuy-ok').addEventListener('click', function () { rebuyCommit(ov, name); });
+    var steppers = ov.querySelectorAll('[data-rebuy-delta]');
+    for (var s = 0; s < steppers.length; s++) {
+      steppers[s].addEventListener('click', function () {
+        var tgt = document.getElementById('rebuy-qty');
+        var cur = parseInt(String(tgt.textContent).replace(/[^\d]/g, ''), 10);
+        if (isNaN(cur) || cur < 1) cur = 1;
+        var d = parseInt(this.getAttribute('data-rebuy-delta'), 10) || 0;
+        cur += d; if (cur < 1) cur = 1;
+        tgt.textContent = cur;
+      });
+    }
+  }
+  // 简单 HTML 转义（浮层内嵌用户数据安全）
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+  // 补录提交：同名用户条目 → 数量累加；纯演示/无同名 → 以本次数量登记为新用户条目（演示名被真实记录替换）
+  async function rebuyCommit(ov, name) {
+    var qtyEl = document.getElementById('rebuy-qty');
+    var qty = parseInt(String(qtyEl ? qtyEl.textContent : '1').replace(/[^\d]/g, ''), 10);
+    if (isNaN(qty) || qty < 1) { toast('请输入正确的本次数量（至少 1）'); return; }
+    var priceEl = document.getElementById('rebuy-price');
+    var newPrice = normPrice(priceEl ? priceEl.value : '');
+    var items = loadUserItems();
+    var recent = null;
+    for (var i = 0; i < items.length; i++) { if (items[i] && items[i].name === name) { recent = items[i]; break; } }
+    var today = new Date(); var dstr = today.toISOString().slice(0, 10);
+
+    if (!recent) {
+      // 无同名用户条目：登记为新用户条目（含"演示转真实"），qty=本次补录量
+      var base = ITEM_DETAILS[name] || {};
+      var ni = {
+        name: name,
+        category: normalizeCat(base.cat || '其他'),
+        loc: (base.loc && base.loc !== '未设置') ? base.loc : '未设置',
+        qty: String(qty),
+        tags: '', badge: 'ok', badgeText: '正常', added: dstr, member: (typeof SELF_ID !== 'undefined') ? SELF_ID : '1',
+        note: '', prod: '—', exp: '—', batch: '—', photo: '',
+        unitPrice: newPrice
+      };
+      var arr1 = loadUserItems().filter(function (it) { return !(it && it.name === name); });
+      arr1.unshift(ni);
+      var res1 = await saveUserItemsResilient(arr1);
+      if (!res1.ok) { toast('保存失败：本地存储空间不足，请清理后重试'); return; }
+      mergeUserItemsIntoDetails();
+      renderItemLists(); renderReminderCenter();
+      ov.remove();
+      _viewingItem = name; fillDetail(name);
+      if (isDemoName(name)) toast('已登记「' + name + '」为真实物品（数量 ' + qty + '，示例数据已替换）');
+      else toast('已加入物品库：' + name + ' ×' + qty);
+      return;
+    }
+    // 同名累加：oldQty + 本次；数量以字符串保存；不产生编号（绕开 save-item 的自动编号路径）
+    var oldQty = parseQtyNum(recent.qty);
+    var newQty = oldQty + qty;
+    var oldPrice = normPrice(recent.unitPrice);
+    // 冲突取值：两价均>0 且不同 → 显式询问；单方有价 → 取有价方；都 0 → 0
+    resolvePriceConflict(oldPrice, newPrice, name, async function (finalPrice) {
+      if (finalPrice === null || finalPrice === undefined) { toast('已取消本次补录'); return; }
+      var upd = Object.assign({}, recent, {
+        qty: String(newQty),
+        unitPrice: finalPrice,
+        updatedAt: new Date().toISOString()
+      });
+      var rest = loadUserItems().filter(function (it) { return !(it && it.name === name); });
+      rest.unshift(upd);
+      var res2 = await saveUserItemsResilient(rest);
+      if (!res2.ok) { toast('保存失败：本地存储空间不足，请清理后重试'); return; }
+      mergeUserItemsIntoDetails();
+      renderItemLists(); renderReminderCenter();
+      ov.remove();
+      _viewingItem = name; fillDetail(name);
+      toast('已补录：' + name + ' 数量 ' + oldQty + ' → ' + newQty);
+    });
+  }
+  // 同名价格冲突取值：双方有价不同 → 询问弹层（A 原价 / B 新价 / 取消）
+  function resolvePriceConflict(oldP, newP, name, cb) {
+    if (oldP > 0 && newP > 0 && oldP !== newP) {
+      showAskPrice(name, oldP, newP, cb);
+      return;
+    }
+    cb(oldP > 0 ? oldP : (newP > 0 ? newP : 0));
+  }
+  function showAskPrice(name, oldP, newP, cb) {
+    var old2 = document.getElementById('ask-price-modal'); if (old2) old2.remove();
+    var ov2 = document.createElement('div');
+    ov2.id = 'ask-price-modal';
+    ov2.innerHTML =
+      '<div class="lic-mask"></div>' +
+      '<div class="lic-box">' +
+        '<div class="lic-title">单价不一致</div>' +
+        '<div class="lic-sub" style="color:#6b7688;font-size:13px;margin:8px 0 4px;">「' + esc(name) + '」原有单价与本次填写不同，请选择保留哪个：</div>' +
+        '<div style="font-size:15px;color:#0f172a;font-weight:700;margin:10px 0 2px;">原有单价 ¥' + Number(oldP).toFixed(2) + '</div>' +
+        '<div style="font-size:13px;color:#6b7688;margin-bottom:4px;">本次填写 ¥' + Number(newP).toFixed(2) + '</div>' +
+        '<div class="lic-btns" style="margin-top:14px;">' +
+          '<button class="lic-btn-primary" id="ask-keep-old" style="width:100%;padding:13px;border:none;border-radius:10px;background:var(--accent,#5F7F5A);color:#fff;font-size:15px;font-weight:600;cursor:pointer;">保留原单价 ¥' + Number(oldP).toFixed(2) + '</button>' +
+          '<button class="lic-btn-plain" id="ask-use-new" style="width:100%;padding:12px;border:1px solid #e6eaf2;border-radius:10px;background:#fff;color:#3b4252;font-size:14px;margin-top:8px;cursor:pointer;">改用新单价 ¥' + Number(newP).toFixed(2) + '</button>' +
+          '<button class="lic-btn-plain" id="ask-cancel" style="width:100%;padding:12px;border:none;background:transparent;color:#9aa3b2;font-size:13px;margin-top:4px;cursor:pointer;">取消本次补录</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(ov2);
+    var style2 = document.createElement('style');
+    style2.textContent = '#ask-price-modal .lic-mask{position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:10002}#ask-price-modal .lic-box{position:fixed;z-index:10003;left:50%;top:50%;transform:translate(-50%,-50%);width:min(88vw,360px);background:#fff;border-radius:16px;padding:24px 20px 18px;box-shadow:0 20px 60px rgba(0,0,0,.25);text-align:center}';
+    document.head.appendChild(style2);
+    ov2.querySelector('#ask-keep-old').addEventListener('click', function () { ov2.remove(); cb(oldP); });
+    ov2.querySelector('#ask-use-new').addEventListener('click', function () { ov2.remove(); cb(newP); });
+    ov2.querySelector('#ask-cancel').addEventListener('click', function () { ov2.remove(); cb(null); });
+    ov2.querySelector('.lic-mask').addEventListener('click', function () { ov2.remove(); cb(null); });
   }
 
   /* ── toast ── */
@@ -3460,6 +3684,7 @@ case 'show-deleted': showDeletedItems(); break;
         enterDetailEdit();
         break;
       case 'delete-item':  deleteItem(_viewingItem); break;
+      case 'rebuy-item':    openRebuyModal(_viewingItem); break;
       case 'save-item-edit':
         saveItemEdit();
         break;
@@ -3486,6 +3711,7 @@ case 'show-deleted': showDeletedItems(); break;
       case 'go-scan-confirm': inFlow = true; showPage('page-scan-confirm'); break;
       case 'go-date-back':   try { stopCamera(); } catch (e) {} showPage(_scanReturnPage || 'page-home'); break;
       case 'add-item-photo': inFlow = true; window.__lastShotDataURL = ''; _addPhotoItem = _viewingItem; _scanReturnPage = 'page-detail'; setMedicineHeader('photo'); showPage('page-medicine'); startCamera(); break;
+      case 'replace-item-photo': inFlow = true; window.__lastShotDataURL = ''; _addPhotoItem = _viewingItem; _scanReturnPage = 'page-detail'; setMedicineHeader('replace'); showPage('page-medicine'); startCamera(); break;
       case 'view-photo': viewPhoto(); break;
       case 'export-backup': exportBackup(); break;
       case 'import-backup': importBackup(); break;
@@ -3760,6 +3986,8 @@ case 'show-deleted': showDeletedItems(); break;
     }
     var fexpEl = document.getElementById('f-exp');
     var fexp = fexpEl && fexpEl.value ? fexpEl.value : '';
+    var fpriceEl = document.getElementById('f-price');
+    var fprice = fpriceEl && fpriceEl.value ? fpriceEl.value : '';
     var badge = 'ok', badgeText = '正常';
     if (fexp) {
       var _p = fexp.split('-');
@@ -3780,7 +4008,8 @@ case 'show-deleted': showDeletedItems(); break;
       qty: qtyEl ? qtyEl.textContent.trim() : '1',
       tags: tagEl ? tagEl.textContent.trim() : '',
       badge: badge, badgeText: badgeText, added: dstr, member: '1',
-      note: '', prod: '—', exp: fexp || '—', batch: '—', photo: _shot
+      note: '', prod: '—', exp: fexp || '—', batch: '—', photo: _shot,
+      unitPrice: normPrice(fprice)
     };
     var _arr = loadUserItems().filter(function (it) { return !(it && it.name === name); });
     _arr.unshift(_newItem);
@@ -3812,6 +4041,19 @@ case 'show-deleted': showDeletedItems(); break;
     { name: '户口本', badge: 'ok', badgeText: '正常', meta: '证件 · 添加于 2026-03-11 · @m1', loc: '玄关 · 衣柜', qty: '1 本', cat: '证件' },
     { name: '工具箱', badge: 'ok', badgeText: '正常', meta: '工具 · 添加于 2026-04-05 · @m1', loc: '储藏室1', qty: '1 套', cat: '工具' }
   ];
+  // ── L1 V12.0 单价/金额工具（unitPrice 单件价，0=未填；金额=单价×数量 派生不落库）──
+  var DEMO_NAME_SET = {};
+  DEMO_ITEMS.forEach(function (d) { if (d && d.name) DEMO_NAME_SET[d.name] = 1; });
+  function isDemoName(name) { return !!DEMO_NAME_SET[name]; }
+  function normPrice(v) { var p = parseFloat(v); return (isFinite(p) && p > 0) ? p : 0; }
+  function parseQtyNum(q) { var p = parseFloat(String(q == null ? '' : q).replace(/[^\d.]/g, '')); return (isFinite(p) && p > 0) ? p : 0; }
+  function calcAmount(it) {
+    if (!it) return null;
+    var p = parseFloat(it.unitPrice); if (!isFinite(p) || p <= 0) return null;   // 0/NaN=未填（演示物品恒 0 → 天然排除）
+    var q = parseQtyNum(it.qty); if (q <= 0) q = 1;                               // qty 容忍 '2 盒' 带单位字符串
+    return p * q;
+  }
+  function fmtMoney(n) { return (n == null || !isFinite(n)) ? '未填' : '¥' + (Math.round(n * 100) / 100).toFixed(2); }
   function demoIcon(name) {
     // 根据名称返回对应图标的 SVG path（尽量贴近原演示视觉）
     if (/药|维生素/.test(name)) return '<svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="3"/><path d="M9 8h6M9 12h6M9 16h4"/></svg>';
@@ -3864,6 +4106,7 @@ case 'show-deleted': showDeletedItems(); break;
     else { icon = '<div class="item-thumb">' + demoIcon(it.name) + '</div>'; }
     var sub = it.loc || '';
     if (it.qty && it.qty !== '1') sub += ' · ' + it.qty;
+    var _rowAmt = calcAmount(it); if (_rowAmt != null) sub += ' · ' + fmtMoney(_rowAmt);
     if (!sub) sub = it.meta || '';
     var _bd = getItemBadge(it);
     row.innerHTML = icon + '<div><div class="i-name"></div><div class="i-sub"></div></div><span class="badge ' + _bd.badge + '"></span>';
@@ -4347,12 +4590,19 @@ function renderItemLists() {    var items = getAllItems();
   function setMedicineHeader(mode) {
     var t = document.querySelector('#page-medicine .flow-title');
     var tip = document.querySelector('#page-medicine .scan-tip');
+    var meta = document.getElementById('shutter-med-meta');
     if (mode === 'photo') {
       if (t) t.textContent = '拍照添加';
       if (tip) tip.innerHTML = '对准物品拍摄<br><span class="mono">拍摄后自动保存到详情</span>';
+      if (meta) meta.textContent = '拍摄后自动保存到详情';
+    } else if (mode === 'replace') {
+      if (t) t.textContent = '重新拍照';
+      if (tip) tip.innerHTML = '对准物品重新拍摄<br><span class="mono">拍摄后替换原照片，保留本次编辑内容</span>';
+      if (meta) meta.textContent = '拍摄后替换原照片';
     } else {
       if (t) t.textContent = '扫描日期';
       if (tip) tip.innerHTML = '对准包装上的日期区域<br><span class="mono">拍摄后确认日期，回填到物品</span>';
+      if (meta) meta.textContent = '拍摄后确认并保存日期';
     }
   }
   document.getElementById('shutter-med').addEventListener('click', function () {
@@ -4371,13 +4621,20 @@ function renderItemLists() {    var items = getAllItems();
       }
       var dmP = (dP.meta || '').match(/@(\w+)/);
       var addedP = ((dP.meta || '').match(/添加于\s*([\d-]+)/) || [])[1] || '';
-      upsertUserItem({ name: pName, category: dP.cat || dP.category || '其他', loc: dP.loc || '未设置', qty: dP.qty || '1', tags: dP.tags || '', badge: dP.badge || 'ok', badgeText: dP.badgeText || '正常', added: addedP, member: (dmP && dmP[1]) || '1', note: dP.note || '', prod: dP.prod || '—', exp: dP.exp || '—', batch: dP.batch || '—', photo: frame });
+      upsertUserItem({ name: pName, category: dP.cat || dP.category || '其他', loc: dP.loc || '未设置', qty: dP.qty || '1', tags: dP.tags || '', badge: dP.badge || 'ok', badgeText: dP.badgeText || '正常', added: addedP, member: (dmP && dmP[1]) || '1', note: dP.note || '', prod: dP.prod || '—', exp: dP.exp || '—', batch: dP.batch || '—', photo: _frame });
       mergeUserItemsIntoDetails();
       renderItemLists();
       _addPhotoItem = null;
       try { stopCamera(); } catch (e) {}
-      _viewingItem = pName; fillDetail(pName); resetDetailEditMode(); showPage('page-detail');
-      toast('已添加照片');
+      _viewingItem = pName;
+      if (_detailEditing) {
+        // 编辑态重拍：照片已覆盖保存，保留编辑表单未保存字段，停留编辑态（V12.1）
+        fillDetail(pName); showPage('page-detail');
+        toast('照片已更新，可继续编辑');
+      } else {
+        fillDetail(pName); resetDetailEditMode(); showPage('page-detail');
+        toast('已添加照片');
+      }
       return;
     }
   });
@@ -4623,13 +4880,13 @@ function renderItemLists() {    var items = getAllItems();
   }
 
   /* ═══════════ 关于本软件 ═══════════ */
-  var APP_VERSION = '11.8';
+  var APP_VERSION = '12.1';
   window.APP_VERSION = APP_VERSION;   // 暴露给锁屏等外部脚本
   var APP_AUTHOR = 'Peter.Xiong';
   var APP_MAKER = '智普 AutoClaw 的设计专家系统';
   var APP_INTRO = '本软件由 ' + APP_AUTHOR + ' 利用 ' + APP_MAKER + ' 设计。用于家庭物品管理，如有问题和建议或希望长期使用，请与 Peterx 联系：peterx@qq.com。';
-  var APP_DATE = '2026年8月31日';
-  var APP_FEATURES = '拍照入库、效期提醒（药品/食品/家电）、拼音搜索、位置管理、家庭成员、备份导入导出、启动密码锁、离线授权试用';
+  var APP_DATE = '2026年9月3日';
+  var APP_FEATURES = '拍照入库、效期提醒（药品/食品/家电）、拼音搜索、位置管理、家庭成员、单价记录与金额、再买一件补录、编辑时重新拍照替换照片、备份导入导出、启动密码锁、离线授权试用';
   var APP_STORE = '照片压缩存储（证件类清晰可读），数据仅存本机、不联网；卸载或清数据会清空记录，请定期导出备份。';
   var APP_DIFF = '本版（普通版）照片压缩存储、轻量省空间；专业版照片原图、数量无上限，适合证件高清存档；两版备份（.fibe）互通。';
 

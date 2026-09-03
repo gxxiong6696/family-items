@@ -1,8 +1,8 @@
-/* 家庭物品管理系统 PWA Service Worker
+﻿/* 家庭物品管理系统 PWA Service Worker
    策略：离线优先 + 后台网络更新（stale-while-revalidate 简化版）
    缓存：应用外壳（HTML/manifest/图标）全部预缓存，离线可完整打开 */
 
-var CACHE_NAME = 'family-items-v87-20260903-1044';
+var CACHE_NAME = 'family-items-v89-20260903-1750';
 
 var APP_SHELL = [
   './',
